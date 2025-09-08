@@ -1,1 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sunwal 132/33 KV SS </title>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBa1Gb5uDd8-Rjue5VxTE7kOQ9O2n-2xbI",
+      authDomain: "feeders-status-21646.firebaseapp.com",
+      databaseURL: "https://feeders-status-21646-default-rtdb.firebaseio.com/",
+      projectId: "feeders-status-21646",
+      storageBucket: "feeders-stat1646.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const systems = ["33kv system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4"];
+
+    function updateStatus(name, value) {
+      const card = document.getElementById(name.replace(" ", "-"));
+      if (!card) return;
+
+      let status;
+      if (name === "33kv system") {
+        status = value === 1 ? "LIVE" : "System Fail";
+        card.className = value === 1 ? "status-card live" : "status-card dead";
+      } else {
+        status = value === 1 ? "ON" : "OFF/TRIP";
+        card.className = value === 1 ? "status-card on" : "status-card off";
+      }
+
+      card.querySelector(".status-text").innerText = status;
+    }
+
+    systems.forEach(sys => {
+      const sysRef = ref(db, sys);
+      onValue(sysRef, (snap) => { updateStatus(sys, snap.val()); });
+    });
+  </script>
+
+  <!-- Styles -->
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(-45deg, #141E30, #243B55, #4b6cb7, #182848);
+      background-size: 400% 400%;
+      animation: gradientBG 15s ease infinite;
+      color: #fff;
+    }
+
+    @keyframes gradientBG {
+      0% { background-position: 0% 50% }
+      50% { background-position: 100% 50% }
+      100% { background-position: 0% 50% }
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 30px;
+      font-weight: 700;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+
+    .grid {
+      display: grid;
+      gap: 20px;
+    }
+
+    @media (min-width: 768px) {
+      .grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+    }
+
+    .status-card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 25px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      transition: transform 0.3s ease, background 0.3s ease;
+    }
+
+    .status-card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .status-title {
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+    }
+
+    .status-text {
+      font-size: 26px;
+      font-weight: bold;
+      padding: 12px 0;
+      border-radius: 12px;
+      color: white;
+      transition: background 0.3s ease;
+    }
+
+    /* Colors */
+    .on .status-text, .live .status-text { background: #28a745; }
+    .off .status-text, .dead .status-text { background: #dc3545; }
+  </style>
+</head>
+<body>
+  <h1>Sunwal 132/33 KV SS<h1>
+
+  <div class="grid">
+    <div id="33kv-system" class="status-card">
+      <div class="status-title">33KV SYSTEM</div>
+      <div class="status-text">--</div>
+    </div>
+
+    <div id="Feeder-1" class="status-card">
+      <div class="status-title">11kv Feeder-1</div>
+      <div class="status-text">--</div>
+    </div>
+
+    <div id="Feeder-2" class="status-card">
+      <div class="status-title">11kv Feeder-2</div>
+      <div class="status-text">--</div>
+    </div>
+
+    <div id="Feeder-3" class="status-card">
+      <div class="status-title">11kv Feeder-3</div>
+      <div class="status-text">--</div>
+    </div>
+
+    <div id="Feeder-4" class="status-card">
+      <div class="status-title">11kv Feeder-4</div>
+      <div class="status-text">--</div>
+    </div>
+  </div>
+</body>
+</html>
 
