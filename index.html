@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>NEA Batase Substation</title>
+<title>NEA Substation</title>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getDatabase, ref, onValue, push, remove, query, limitToLast, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+import { getDatabase, ref, onValue, push, remove, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
 // Firebase Config
 const firebaseConfig = {
@@ -21,66 +21,51 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const systems = ["33kv system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4"];
+const systems = ["33kv system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4", "Feeder-5", "Feeder-6", "Feeder-7", "Feeder-8"];
 const lastStatus = {};
 const latestLogs = {};
-const allLogs = {}; // store logs for CSV
+const allLogs = {};
 
-// Update Status UI
 function updateStatus(name, value) {
   const box = document.getElementById(name.replace(" ", "-"));
   if (!box) return;
-
   let currentStatus = value === 1 ? (name === "33kv system" ? "LIVE" : "ON") : (name === "33kv system" ? "System_Fail" : "OFF/TRIP");
   box.innerText = currentStatus;
-
   if (currentStatus === "System_Fail" || currentStatus === "OFF/TRIP") {
     box.className = "status-box off blink-red";
   } else {
     box.className = "status-box on";
   }
-
   if (lastStatus[name] !== undefined && lastStatus[name] !== currentStatus) {
     logEvent(name, currentStatus);
   }
   lastStatus[name] = currentStatus;
 }
 
-// Write log into Firebase keeping max 5 events
 async function logEvent(system, status) {
   const now = new Date().toLocaleString();
   const logRef = ref(db, "logs/" + system);
-
-  // Get existing logs
   const snap = await get(logRef);
   let logs = snap.val() ? Object.entries(snap.val()) : [];
-
   if (logs.length >= 5) {
-    // Delete oldest log
     const oldestKey = logs[0][0];
     await remove(ref(db, `logs/${system}/${oldestKey}`));
   }
-
-  // Add new log
   await push(logRef, { time: now, status: status });
 }
 
-// Show logs for each system
 function showLogs(system) {
   const logRef = ref(db, "logs/" + system);
   const tableBody = document.getElementById(system.replace(" ", "-") + "-log");
-
   onValue(logRef, (snap) => {
     tableBody.innerHTML = "";
     const logs = snap.val();
     allLogs[system] = logs ? Object.values(logs).reverse() : [];
     latestLogs[system] = allLogs[system].length ? allLogs[system][0].status : null;
-
     if (!logs) {
       tableBody.innerHTML = "<tr><td colspan='2'>No events yet</td></tr>";
       return;
     }
-
     allLogs[system].forEach(log => {
       const row = document.createElement("tr");
       row.innerHTML = `<td>${log.time}</td><td>${log.status}</td>`;
@@ -95,14 +80,12 @@ function showLogs(system) {
   });
 }
 
-// CSV download
 function downloadCSV(system) {
   const logs = allLogs[system] || [];
   let csvContent = "Time,Status\n";
   logs.forEach(log => {
     csvContent += `${log.time},${log.status}\n`;
   });
-
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -110,10 +93,8 @@ function downloadCSV(system) {
   link.click();
 }
 
-// Attach Firebase listeners
 systems.forEach(sys => {
   const sysRef = ref(db, sys);
-
   onValue(sysRef, (snap) => {
     const val = snap.val();
     if (lastStatus[sys] === undefined) {
@@ -123,32 +104,42 @@ systems.forEach(sys => {
       updateStatus(sys, val);
     }
   });
-
   showLogs(sys);
 });
 </script>
 
 <style>
-body { font-family: "Segoe UI", Arial, sans-serif; margin:0; padding:20px; color:#fff;
-  background: linear-gradient(-45deg,#1e3c72,#2a5298,#4e54c8,#8f94fb); background-size:400% 400%; animation: gradientBG 12s ease infinite;}
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  margin:0; padding:20px;
+  color:#fff;
+  background: linear-gradient(135deg,#1e3c72,#2a5298,#6a11cb,#2575fc);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+}
 @keyframes gradientBG {0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-h1 { text-align:center; margin-bottom:20px; font-size:32px; font-weight:700; text-shadow:0 2px 5px rgba(0,0,0,0.4);}
+h1 { text-align:center; margin-bottom:20px; font-size:32px; font-weight:700; text-shadow:0 2px 5px rgba(0,0,0,0.5);}
 .dashboard { display:flex; flex-wrap:wrap; gap:20px; justify-content:center;}
-.card { background: rgba(255,255,255,0.15); border-radius:16px; padding:20px; backdrop-filter: blur(10px); width:280px; box-shadow:0 4px 20px rgba(0,0,0,0.3);}
-h2 { text-align:center; }
-.status-box { padding:12px; border-radius:10px; font-size:20px; font-weight:bold; text-align:center; margin-bottom:15px; }
+.card { background: rgba(255,255,255,0.12); border-radius:20px; padding:15px; backdrop-filter: blur(12px); width:280px; box-shadow:0 6px 25px rgba(0,0,0,0.35); transition: transform 0.2s ease;}
+.card:hover { transform: scale(1.03);}
+h2 { text-align:center; font-size:20px; margin-bottom:10px;}
+.status-box { padding:12px; border-radius:12px; font-size:20px; font-weight:bold; text-align:center; margin-bottom:15px;}
 .on { background:#28a745; }
 .off { background:#dc3545; }
-table { width:100%; border-collapse:collapse; font-size:14px; }
-th, td { border:1px solid rgba(255,255,255,0.2); padding:6px; text-align:center; }
+table { width:100%; border-collapse:collapse; font-size:14px;}
+th, td { border:1px solid rgba(255,255,255,0.2); padding:6px; text-align:center;}
 th { background: rgba(0,0,0,0.3);}
 @keyframes blink {0%,50%,100%{background-color: rgba(220,53,69,0.7);}25%,75%{background-color: rgba(255,0,0,0.2);}}
-.blink-red { animation: blink 1s infinite; }
-.download-btn { margin-top:10px; padding:6px 12px; border:none; border-radius:6px; background-color:#007bff; color:#fff; cursor:pointer; font-weight:bold;}
+.blink-red { animation: blink 1s infinite;}
+.download-btn { margin-top:10px; padding:8px 14px; border:none; border-radius:6px; background-color:#007bff; color:#fff; cursor:pointer; font-weight:bold; width:100%; transition:0.3s;}
+.download-btn:hover { background-color:#0056b3;}
+footer { text-align:center; margin-top:30px; font-size:14px; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.3);}
+@media (max-width:768px) { .card{ width:90%; } }
+@media (max-width:480px) { h1{ font-size:28px;} h2{ font-size:18px;} .status-box{ font-size:18px; padding:10px;} .download-btn{padding:6px 12px;font-size:14px;} }
 </style>
 </head>
 <body>
-<h1>⚡ NEA Substation </h1>
+<h1>⚡ NEA Substation</h1>
 
 <div class="dashboard">
   <div class="card">
@@ -161,45 +152,73 @@ th { background: rgba(0,0,0,0.3);}
     <button class="download-btn" onclick="downloadCSV('33kv system')">Download CSV</button>
   </div>
 
+  <!-- Feeders 1 to 8 -->
   <div class="card">
     <h2>Feeder-1</h2>
     <div id="Feeder-1" class="status-box">--</div>
-    <table>
-      <thead><tr><th>Time</th><th>Status</th></tr></thead>
+    <table><thead><tr><th>Time</th><th>Status</th></tr></thead>
       <tbody id="Feeder-1-log"><tr><td colspan="2">No events yet</td></tr></tbody>
     </table>
     <button class="download-btn" onclick="downloadCSV('Feeder-1')">Download CSV</button>
   </div>
-
   <div class="card">
     <h2>Feeder-2</h2>
     <div id="Feeder-2" class="status-box">--</div>
-    <table>
-      <thead><tr><th>Time</th><th>Status</th></tr></thead>
+    <table><thead><tr><th>Time</th><th>Status</th></tr></thead>
       <tbody id="Feeder-2-log"><tr><td colspan="2">No events yet</td></tr></tbody>
     </table>
     <button class="download-btn" onclick="downloadCSV('Feeder-2')">Download CSV</button>
   </div>
-
   <div class="card">
     <h2>Feeder-3</h2>
     <div id="Feeder-3" class="status-box">--</div>
-    <table>
-      <thead><tr><th>Time</th><th>Status</th></tr></thead>
+    <table><thead><tr><th>Time</th><th>Status</th></tr></thead>
       <tbody id="Feeder-3-log"><tr><td colspan="2">No events yet</td></tr></tbody>
     </table>
     <button class="download-btn" onclick="downloadCSV('Feeder-3')">Download CSV</button>
   </div>
-
   <div class="card">
     <h2>Feeder-4</h2>
     <div id="Feeder-4" class="status-box">--</div>
-    <table>
-      <thead><tr><th>Time</th><th>Status</th></tr></thead>
+    <table><thead><tr><th>Time</th><th>Status</th></tr></thead>
       <tbody id="Feeder-4-log"><tr><td colspan="2">No events yet</td></tr></tbody>
     </table>
     <button class="download-btn" onclick="downloadCSV('Feeder-4')">Download CSV</button>
   </div>
+  <div class="card">
+    <h2>Feeder-5</h2>
+    <div id="Feeder-5" class="status-box">--</div>
+    <table><thead><tr><th>Time</th><th>Status</th></tr></thead>
+      <tbody id="Feeder-5-log"><tr><td colspan="2">No events yet</td></tr></tbody>
+    </table>
+    <button class="download-btn" onclick="downloadCSV('Feeder-5')">Download CSV</button>
+  </div>
+  <div class="card">
+    <h2>Feeder-6</h2>
+    <div id="Feeder-6" class="status-box">--</div>
+    <table><thead><tr><th>Time</th><th>Status</th></tr></thead>
+      <tbody id="Feeder-6-log"><tr><td colspan="2">No events yet</td></tr></tbody>
+    </table>
+    <button class="download-btn" onclick="downloadCSV('Feeder-6')">Download CSV</button>
+  </div>
+  <div class="card">
+    <h2>Feeder-7</h2>
+    <div id="Feeder-7" class="status-box">--</div>
+    <table><thead><tr><th>Time</th><th>Status</th></tr></thead>
+      <tbody id="Feeder-7-log"><tr><td colspan="2">No events yet</td></tr></tbody>
+    </table>
+    <button class="download-btn" onclick="downloadCSV('Feeder-7')">Download CSV</button>
+  </div>
+  <div class="card">
+    <h2>Feeder-8</h2>
+    <div id="Feeder-8" class="status-box">--</div>
+    <table><thead><tr><th>Time</th><th>Status</th></tr></thead>
+      <tbody id="Feeder-8-log"><tr><td colspan="2">No events yet</td></tr></tbody>
+    </table>
+    <button class="download-btn" onclick="downloadCSV('Feeder-8')">Download CSV</button>
+  </div>
 </div>
+
+<footer>Designed by Subhash Subedi @2025</footer>
 </body>
 </html>
