@@ -5,7 +5,7 @@
 <title>NEA Batase Substation</title>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getDatabase, ref, onValue, push, remove } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+import { getDatabase, ref, onValue, push, remove, query, limitToLast, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
 // Firebase Config
 const firebaseConfig = {
@@ -23,18 +23,18 @@ const db = getDatabase(app);
 
 const systems = ["33kv system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4"];
 const lastStatus = {};
-const latestLogs = {}; // Track latest log status
-const allLogs = {}; // Store all logs for CSV
+const latestLogs = {};
+const allLogs = {}; // store logs for CSV
 
 // Update Status UI
 function updateStatus(name, value) {
   const box = document.getElementById(name.replace(" ", "-"));
   if (!box) return;
 
-  let currentStatus = (value === 1 ? (name === "33kv system" ? "LIVE" : "ON") : (name === "33kv system" ? "DEAD" : "OFF"));
+  let currentStatus = value === 1 ? (name === "33kv system" ? "LIVE" : "ON") : (name === "33kv system" ? "System_Fail" : "OFF/TRIP");
   box.innerText = currentStatus;
 
-  if (currentStatus === "DEAD" || currentStatus === "OFF") {
+  if (currentStatus === "System_Fail" || currentStatus === "OFF/TRIP") {
     box.className = "status-box off blink-red";
   } else {
     box.className = "status-box on";
@@ -46,38 +46,47 @@ function updateStatus(name, value) {
   lastStatus[name] = currentStatus;
 }
 
-// Write Log into Firebase
-function logEvent(system, status) {
+// Write log into Firebase keeping max 5 events
+async function logEvent(system, status) {
   const now = new Date().toLocaleString();
   const logRef = ref(db, "logs/" + system);
-  push(logRef, { time: now, status: status });
+
+  // Get existing logs
+  const snap = await get(logRef);
+  let logs = snap.val() ? Object.entries(snap.val()) : [];
+
+  if (logs.length >= 5) {
+    // Delete oldest log
+    const oldestKey = logs[0][0];
+    await remove(ref(db, `logs/${system}/${oldestKey}`));
+  }
+
+  // Add new log
+  await push(logRef, { time: now, status: status });
 }
 
-// Show Logs and handle blinking, display only last 4 logs
+// Show logs for each system
 function showLogs(system) {
   const logRef = ref(db, "logs/" + system);
   const tableBody = document.getElementById(system.replace(" ", "-") + "-log");
-  allLogs[system] = [];
 
   onValue(logRef, (snap) => {
+    tableBody.innerHTML = "";
     const logs = snap.val();
     allLogs[system] = logs ? Object.values(logs).reverse() : [];
     latestLogs[system] = allLogs[system].length ? allLogs[system][0].status : null;
 
-    tableBody.innerHTML = "";
     if (!logs) {
       tableBody.innerHTML = "<tr><td colspan='2'>No events yet</td></tr>";
       return;
     }
 
-    // Display only last 4 events
-    const displayLogs = allLogs[system].slice(0, 4);
-    displayLogs.forEach(log => {
+    allLogs[system].forEach(log => {
       const row = document.createElement("tr");
       row.innerHTML = `<td>${log.time}</td><td>${log.status}</td>`;
-      if ((system === "33kv system" && log.status === "DEAD") ||
-          (system !== "33kv system" && log.status === "OFF")) {
-        if (latestLogs[system] === "DEAD" || latestLogs[system] === "OFF") {
+      if ((system === "33kv system" && log.status === "System_Fail") ||
+          (system !== "33kv system" && log.status === "OFF/TRIP")) {
+        if (latestLogs[system] === "System_Fail" || latestLogs[system] === "OFF/TRIP") {
           row.classList.add("blink-red");
         }
       }
@@ -86,16 +95,12 @@ function showLogs(system) {
   });
 }
 
-// CSV download for all logs of today
+// CSV download
 function downloadCSV(system) {
-  const today = new Date().toLocaleDateString();
   const logs = allLogs[system] || [];
   let csvContent = "Time,Status\n";
-
   logs.forEach(log => {
-    if (log.time.includes(today)) {
-      csvContent += `${log.time},${log.status}\n`;
-    }
+    csvContent += `${log.time},${log.status}\n`;
   });
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -105,18 +110,6 @@ function downloadCSV(system) {
   link.click();
 }
 
-// Daily reset of logs at 00:00
-function dailyReset() {
-  const now = new Date();
-  if (now.getHours() === 0 && now.getMinutes() === 0) {
-    systems.forEach(system => {
-      const logRef = ref(db, "logs/" + system);
-      remove(logRef);
-    });
-  }
-}
-setInterval(dailyReset, 60000); // check every minute
-
 // Attach Firebase listeners
 systems.forEach(sys => {
   const sysRef = ref(db, sys);
@@ -124,7 +117,7 @@ systems.forEach(sys => {
   onValue(sysRef, (snap) => {
     const val = snap.val();
     if (lastStatus[sys] === undefined) {
-      lastStatus[sys] = val === 1 ? (sys === "33kv system" ? "LIVE" : "ON") : (sys === "33kv system" ? "DEAD" : "OFF");
+      lastStatus[sys] = val === 1 ? (sys === "33kv system" ? "LIVE" : "ON") : (sys === "33kv system" ? "System_Fail" : "OFF/TRIP");
       updateStatus(sys, val);
     } else {
       updateStatus(sys, val);
@@ -155,7 +148,7 @@ th { background: rgba(0,0,0,0.3);}
 </style>
 </head>
 <body>
-<h1>⚡ NEA Batase Substation 33/11 kV</h1>
+<h1>⚡ NEA Substation </h1>
 
 <div class="dashboard">
   <div class="card">
