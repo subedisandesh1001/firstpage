@@ -22,7 +22,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const systems = ["33kv system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4", "Feeder-5", "Feeder-6", "Feeder-7"];
+const systems = ["33kv-system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4", "Feeder-5", "Feeder-6", "Feeder-7"];
 const lastStatus = {};
 const allLogs = {};
 const firstLoad = {}; // track first snapshot per system
@@ -47,8 +47,8 @@ async function updateStatus(name, value) {
   if (!box) return;
 
   let currentStatus = value === 1
-    ? (name === "33kv system" ? "LIVE" : "ON")
-    : (name === "33kv system" ? "System_Fail" : "OFF/TRIP");
+    ? (name === "33kv-system" ? "LIVE" : "ON")
+    : (name === "33kv-system" ? "System_Fail" : "OFF/TRIP");
 
   box.innerText = currentStatus;
   box.className = (currentStatus === "System_Fail" || currentStatus === "OFF/TRIP") ? "status-box off blink-red" : "status-box on";
@@ -100,8 +100,8 @@ function showLogs(system) {
       const row = document.createElement("tr");
       row.innerHTML = `<td>${log.time}</td><td>${log.status}</td>`;
       const latestStatus = allLogs[system][0].status;
-      if ((system === "33kv system" && latestStatus === "System_Fail") ||
-          (system !== "33kv system" && latestStatus === "OFF/TRIP")) {
+      if ((system === "33kv-system" && latestStatus === "System_Fail") ||
+          (system !== "33kv-system" && latestStatus === "OFF/TRIP")) {
         row.classList.add("blink-red");
       }
       tableBody.appendChild(row);
