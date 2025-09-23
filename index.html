@@ -89,7 +89,7 @@ function updateStatus(name,value) {
   updateClock();
 
   if(status==="System_Fail" || status==="OFF/TRIP") {
-    box.className = "status-box off";
+    box.className = "status-box off blink-red";
     if(notificationPermission) showBrowserNotification(`${name} status: ${status}`);
     startBlinkingTitle(`⚠️ ${name} ${status}`);
   } else {
@@ -121,6 +121,7 @@ function authenticate() {
   } else {
     alert("Invalid PIN");
     document.getElementById('pin-input').value='';
+    document.getElementById('pin-input').focus();
   }
 }
 
@@ -146,15 +147,24 @@ document.addEventListener('DOMContentLoaded',()=>{
 body{font-family:Arial,sans-serif;margin:0;padding:0;color:#fff;background:#16213e}
 #login-screen{display:flex;align-items:center;justify-content:center;height:100vh}
 .login-container{background:#222;padding:20px;border-radius:10px;text-align:center}
-.pin-input{padding:10px;width:100%;margin-bottom:10px;border:none;border-radius:6px;color:white;text-align:center}
-.login-btn{padding:10px;width:100%;background:#e94560;border:none;color:white;cursor:pointer}
+.pin-input{padding:10px;width:100%;margin-bottom:10px;border:none;border-radius:6px;background:#333;color:white;font-weight:bold;text-align:center;font-size:1.2rem;letter-spacing:5px}
+.pin-input::placeholder{color:#aaa}
+.login-btn{padding:10px;width:100%;background:#e94560;border:none;color:white;cursor:pointer;font-weight:bold}
 #dashboard{display:none}
 .header{text-align:center;padding:15px;background:rgba(0,0,0,0.3)}
 .dashboard{display:flex;flex-wrap:wrap;justify-content:center;gap:15px;padding:15px}
 .card{background:rgba(255,255,255,0.1);padding:10px;border-radius:8px;width:260px;text-align:center}
-.status-box{padding:8px;font-weight:bold;border-radius:6px;text-align:center}
+.status-box{padding:12px;font-weight:bold;border-radius:6px;text-align:center;font-size:1.1rem;transition: all 0.3s ease;}
 .on{background:green}
 .off{background:red}
+
+/* Enhanced blinking animation for OFF/TRIP or System_Fail */
+@keyframes blink-red-animation {
+  0%, 100% { background-color: red; color: white; transform: scale(1);}
+  50% { background-color: darkred; color: white; transform: scale(1.05);}
+}
+.blink-red{animation: blink-red-animation 1s infinite;}
+
 footer{text-align:center;margin-top:20px;padding:10px;background:rgba(0,0,0,0.3)}
 </style>
 </head>
@@ -165,7 +175,7 @@ footer{text-align:center;margin-top:20px;padding:10px;background:rgba(0,0,0,0.3)
   <div class="login-container">
     <h1>⚡ NEA Substation</h1>
     <p>Enter PIN (1234)</p>
-    <input type="password" id="pin-input" class="pin-input" maxlength="4">
+    <input type="password" id="pin-input" class="pin-input" maxlength="4" placeholder="Enter PIN">
     <button id="login-btn" class="login-btn">Login</button>
   </div>
 </div>
@@ -180,20 +190,14 @@ footer{text-align:center;margin-top:20px;padding:10px;background:rgba(0,0,0,0.3)
   </div>
 
   <div class="dashboard">
-    <div class="card">
-      <h2>132 kV System</h2>
-      <div id="33kv-system" class="status-box">--</div>
-    </div>
-    <div class="card">
-      <h2>33 kV System</h2>
-      <div id="Feeder-1" class="status-box">--</div>
-    </div>
+    <div class="card"><h2>132 kV System</h2><div id="33kv-system" class="status-box">--</div></div>
+    <div class="card"><h2>33 kV System</h2><div id="Feeder-1" class="status-box">--</div></div>
     <div class="card"><h2>11 kV Feeder-2</h2><div id="Feeder-2" class="status-box">--</div></div>
     <div class="card"><h2>11 kV Feeder-3</h2><div id="Feeder-3" class="status-box">--</div></div>
-    <div class="card"><h2>11 KV Feeder-4</h2><div id="Feeder-4" class="status-box">--</div></div>
-    <div class="card"><h2>11 KV Feeder-5</h2><div id="Feeder-5" class="status-box">--</div></div>
-    <div class="card"><h2>11 KV Feeder-6</h2><div id="Feeder-6" class="status-box">--</div></div>
-    <div class="card"><h2>11 KV Feeder-7</h2><div id="Feeder-7" class="status-box">--</div></div>
+    <div class="card"><h2>Feeder-4</h2><div id="Feeder-4" class="status-box">--</div></div>
+    <div class="card"><h2>Feeder-5</h2><div id="Feeder-5" class="status-box">--</div></div>
+    <div class="card"><h2>Feeder-6</h2><div id="Feeder-6" class="status-box">--</div></div>
+    <div class="card"><h2>Feeder-7</h2><div id="Feeder-7" class="status-box">--</div></div>
   </div>
 
   <footer>
