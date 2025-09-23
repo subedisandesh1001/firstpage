@@ -7,15 +7,15 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+import { getDatabase, ref, onValue, push, remove, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
 // ================= FIREBASE CONFIG ===================
 const firebaseConfig = {
-  apiKey: "AIzaSyBa1Gb5uDd8-Rjue5VxTE7kOQ9O2n-2xbI", 
-  authDomain: "feeders-status-21646.firebaseapp.com", 
-  databaseURL: "https://feeders-status-21646-default-rtdb.firebaseio.com/", 
-  projectId: "feeders-status-21646", 
-  storageBucket: "feeders-status-21646.appspot.com", 
+  apiKey: "AIzaSyBa1Gb5uDd8-Rjue5VxTE7kOQ9O2n-2xbI",
+  authDomain: "https://feeders-status-21646.firebaseapp.com",
+  databaseURL: "https://feeders-status-21646-default-rtdb.firebaseio.com/",
+  projectId: "https://feeders-status-21646",
+  storageBucket: "https://feeders-status-21646.appspot.com",
   messagingSenderId: "YOUR_SENDER_ID",
   appId: "YOUR_APP_ID"
 };
@@ -31,10 +31,11 @@ let notificationPermission = false;
 let lastReferenceTime = null;
 let blinkInterval = null;
 const originalTitle = "NEA Substation";
+const lastStatus = {}; // Store last known status to detect changes
 
 // ================= HELPER FUNCTIONS ===================
 function formatTime(date) {
-  return new Intl.DateTimeFormat('en-GB', { 
+  return new Intl.DateTimeFormat('en-GB', {
     year:'numeric', month:'2-digit', day:'2-digit',
     hour:'2-digit', minute:'2-digit', second:'2-digit',
     hour12:true
@@ -78,8 +79,8 @@ function stopBlinkingTitle() {
   }
 }
 
-// Update system status
-function updateStatus(name,value) {
+// Update system status & log events only on change
+async function updateStatus(name, value) {
   const box = document.getElementById(name);
   if(!box) return;
 
@@ -96,9 +97,32 @@ function updateStatus(name,value) {
     box.className = "status-box on";
     stopBlinkingTitle();
   }
+
+  // ================ LOG EVENT TO FIREBASE ONLY ON CHANGE =================
+  if(lastStatus[name] !== status){
+    lastStatus[name] = status;
+
+    const logRef = ref(db, 'logs/' + name);
+    const nowFormatted = formatTime(new Date());
+
+    // Push new event
+    await push(logRef, {time: nowFormatted, status: status, timestamp: Date.now()});
+
+    // Remove oldest events if more than 10
+    get(logRef).then(snapshot => {
+      const logs = snapshot.val();
+      if(logs){
+        const keys = Object.keys(logs);
+        if(keys.length > 10){
+          const keysToRemove = keys.slice(0, keys.length - 10);
+          keysToRemove.forEach(k => remove(ref(db, `logs/${name}/${k}`)));
+        }
+      }
+    });
+  }
 }
 
-// Initialize dashboard
+// ================== DASHBOARD INIT =====================
 function initDashboard() {
   setInterval(updateClock, 1000);
   updateClock();
@@ -107,9 +131,13 @@ function initDashboard() {
     const sysRef = ref(db, sys);
     onValue(sysRef, snap => updateStatus(sys, snap.val()));
   });
+
+  // Show events overlay when Events tab is clicked
+  document.getElementById('events-tab-btn').addEventListener('click', ()=>showEventsOverlay());
+  document.getElementById('close-events-btn').addEventListener('click', ()=>document.getElementById('events-overlay').style.display='none');
 }
 
-// Authentication
+// ================== AUTHENTICATION =====================
 function authenticate() {
   const pin = document.getElementById('pin-input').value;
   if(pin===CORRECT_PIN){
@@ -136,7 +164,36 @@ function logout(){
 
 function refreshPage(){ window.location.reload(); }
 
-// DOM Events
+// ================== SHOW EVENTS OVERLAY =====================
+function showEventsOverlay(){
+  const container = document.getElementById('events-container');
+  container.innerHTML = '';
+  document.getElementById('events-overlay').style.display='flex';
+
+  systems.forEach(sys=>{
+    const logRef = ref(db, 'logs/' + sys);
+    get(logRef).then(snap=>{
+      const logs = snap.val();
+      const card = document.createElement('div');
+      card.className='card';
+      card.innerHTML=`<h2>${sys} Events</h2>`;
+      const table = document.createElement('table');
+      table.innerHTML='<tr><th>Time</th><th>Status</th></tr>';
+      if(logs){
+        const logArray = Object.values(logs).sort((a,b)=>b.timestamp-a.timestamp);
+        logArray.forEach(log=>{
+          const row = document.createElement('tr');
+          row.innerHTML=`<td>${log.time}</td><td>${log.status}</td>`;
+          table.appendChild(row);
+        });
+      }
+      card.appendChild(table);
+      container.appendChild(card);
+    });
+  });
+}
+
+// ================= DOM EVENTS =====================
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('login-btn').addEventListener('click',authenticate);
   document.getElementById('pin-input').addEventListener('keypress', e => { if(e.key==="Enter") authenticate(); });
@@ -153,19 +210,32 @@ body{font-family:Arial,sans-serif;margin:0;padding:0;color:#fff;background:#1621
 #dashboard{display:none}
 .header{text-align:center;padding:15px;background:rgba(0,0,0,0.3)}
 .dashboard{display:flex;flex-wrap:wrap;justify-content:center;gap:15px;padding:15px}
-.card{background:rgba(255,255,255,0.1);padding:10px;border-radius:8px;width:260px;text-align:center}
+.card{background:rgba(255,255,255,0.1);padding:10px;border-radius:8px;width:260px;text-align:center;margin-bottom:10px}
 .status-box{padding:12px;font-weight:bold;border-radius:6px;text-align:center;font-size:1.1rem;transition: all 0.3s ease;}
 .on{background:green}
 .off{background:red}
-
 /* Enhanced blinking animation for OFF/TRIP or System_Fail */
 @keyframes blink-red-animation {
   0%, 100% { background-color: red; color: white; transform: scale(1);}
   50% { background-color: darkred; color: white; transform: scale(1.05);}
 }
 .blink-red{animation: blink-red-animation 1s infinite;}
-
 footer{text-align:center;margin-top:20px;padding:10px;background:rgba(0,0,0,0.3)}
+.events-overlay{
+  display:none;
+  position:fixed;
+  top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.95);
+  flex-direction:column;
+  overflow-y:auto;
+  padding:20px;
+  z-index:9999;
+}
+.events-container{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+table{width:100%;border-collapse:collapse;margin-top:5px;color:#fff}
+th,td{border:1px solid rgba(255,255,255,0.3);padding:6px;text-align:center}
+th{background:rgba(0,0,0,0.4)}
+#close-events-btn{position:fixed;top:15px;right:15px;padding:10px 15px;background:#e94560;border:none;color:white;font-weight:bold;cursor:pointer;border-radius:5px;z-index:10000}
 </style>
 </head>
 <body>
@@ -187,6 +257,7 @@ footer{text-align:center;margin-top:20px;padding:10px;background:rgba(0,0,0,0.3)
     <p>Current Time: <span id="current-time">--:--</span> | Last Update: <span id="last-ref-time">--:--</span></p>
     <button onclick="refreshPage()">🔄 Refresh</button>
     <button onclick="logout()">🚪 Logout</button>
+    <button id="events-tab-btn">📋 Events</button>
   </div>
 
   <div class="dashboard">
@@ -194,15 +265,22 @@ footer{text-align:center;margin-top:20px;padding:10px;background:rgba(0,0,0,0.3)
     <div class="card"><h2>33 kV System</h2><div id="Feeder-1" class="status-box">--</div></div>
     <div class="card"><h2>11 kV Feeder-2</h2><div id="Feeder-2" class="status-box">--</div></div>
     <div class="card"><h2>11 kV Feeder-3</h2><div id="Feeder-3" class="status-box">--</div></div>
-    <div class="card"><h2>Feeder-4</h2><div id="Feeder-4" class="status-box">--</div></div>
-    <div class="card"><h2>Feeder-5</h2><div id="Feeder-5" class="status-box">--</div></div>
-    <div class="card"><h2>Feeder-6</h2><div id="Feeder-6" class="status-box">--</div></div>
-    <div class="card"><h2>Feeder-7</h2><div id="Feeder-7" class="status-box">--</div></div>
+    <div class="card"><h2>11 KV Feeder-4</h2><div id="Feeder-4" class="status-box">--</div></div>
+    <div class="card"><h2>11 KV Feeder-5</h2><div id="Feeder-5" class="status-box">--</div></div>
+    <div class="card"><h2>11 KV Feeder-6</h2><div id="Feeder-6" class="status-box">--</div></div>
+    <div class="card"><h2>11 KV Feeder-7</h2><div id="Feeder-7" class="status-box">--</div></div>
   </div>
 
   <footer>
     <p>📧 subedisubedi7@gmail.com | 📞 +977-9847877867</p>
   </footer>
 </div>
+
+<!-- EVENTS OVERLAY -->
+<div class="events-overlay" id="events-overlay">
+  <button id="close-events-btn">✖ Close</button>
+  <div class="events-container" id="events-container"></div>
+</div>
+
 </body>
 </html>
