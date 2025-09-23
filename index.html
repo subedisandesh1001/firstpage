@@ -30,9 +30,27 @@ let lastReferenceTime = null;
 let isAuthenticated = false;
 let visitorCount = 0;
 let notificationPermission = false;
+let deviceId = null;
 
 // Password for authentication (PIN: 1234)
 const CORRECT_PIN = "1234";
+
+// Generate unique device ID to prevent duplicate logs
+function generateDeviceId() {
+  if (!deviceId) {
+    deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+    localStorage.setItem('neaDeviceId', deviceId);
+  }
+  return deviceId;
+}
+
+// Get existing device ID or generate new one
+function getDeviceId() {
+  if (!deviceId) {
+    deviceId = localStorage.getItem('neaDeviceId') || generateDeviceId();
+  }
+  return deviceId;
+}
 
 function formatTime(date) {
   const options = { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true };
@@ -88,9 +106,9 @@ function showBrowserNotification(message, type) {
     body: message,
     icon: icon,
     badge: icon,
-    tag: 'nea-substation', // Group notifications
-    requireInteraction: type === 'alert', // Keep alert notifications visible until dismissed
-    vibrate: type === 'alert' ? [200, 100, 200] : undefined // Vibrate for alerts
+    tag: 'nea-substation',
+    requireInteraction: type === 'alert',
+    vibrate: type === 'alert' ? [200, 100, 200] : undefined
   };
   
   // Show the notification
@@ -158,6 +176,9 @@ function authenticate() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     
+    // Generate device ID
+    getDeviceId();
+    
     // Initialize dashboard
     initDashboard();
     
@@ -219,13 +240,26 @@ async function logEvent(system, status) {
   const snap = await get(logRef);
   let logs = snap.val() ? Object.entries(snap.val()) : [];
 
-  // Keep max 5 events
-  if (logs.length >= 5) {
-    const oldestKey = logs[0][0];
-    await remove(ref(db, `logs/${system}/${oldestKey}`));
-  }
+  // Check if this device already logged this event recently (within 2 seconds)
+  const recentLogs = logs.filter(([key, log]) => {
+    return log.status === status && 
+           Date.now() - new Date(log.time.replace(/(\d+)\/(\d+)\/(\d+), (.+)/, '$2/$1/$3 $4')).getTime() < 2000;
+  });
 
-  await push(logRef, { time: now, status: status });
+  // If no recent logs with same status, add new log
+  if (recentLogs.length === 0) {
+    // Keep max 5 events
+    if (logs.length >= 5) {
+      const oldestKey = logs[0][0];
+      await remove(ref(db, `logs/${system}/${oldestKey}`));
+    }
+
+    await push(logRef, { 
+      time: now, 
+      status: status,
+      deviceId: getDeviceId() // Track which device created the log
+    });
+  }
 }
 
 function showLogs(system) {
@@ -242,10 +276,23 @@ function showLogs(system) {
       return;
     }
 
+    // Filter to show only unique events (remove duplicates from same time/status)
+    const uniqueLogs = [];
+    const seenLogs = new Set();
+    
     allLogs[system].forEach(log => {
+      const logKey = `${log.time}-${log.status}`;
+      if (!seenLogs.has(logKey)) {
+        seenLogs.add(logKey);
+        uniqueLogs.push(log);
+      }
+    });
+
+    // Display only the latest 5 unique logs
+    uniqueLogs.slice(0, 5).forEach(log => {
       const row = document.createElement("tr");
       row.innerHTML = `<td>${log.time}</td><td>${log.status}</td>`;
-      const latestStatus = allLogs[system][0].status;
+      const latestStatus = uniqueLogs[0].status;
       if ((system === "33kv-system" && latestStatus === "System_Fail") ||
           (system !== "33kv-system" && latestStatus === "OFF/TRIP")) {
         row.classList.add("blink-red");
@@ -285,6 +332,9 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Add click event to login button
   document.getElementById('login-btn').addEventListener('click', authenticate);
+  
+  // Auto-focus on PIN input
+  document.getElementById('pin-input').focus();
 });
 
 // Logout function
@@ -293,6 +343,7 @@ function logout() {
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('pin-input').value = '';
+  document.getElementById('pin-input').focus();
   showNotification('You have been logged out.', 'info');
 }
 
@@ -309,16 +360,8 @@ document.addEventListener('visibilitychange', function() {
   }
 });
 
-// Service Worker Registration for Persistent Notifications (Optional)
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/sw.js').then(function(registration) {
-      console.log('ServiceWorker registration successful with scope: ', registration.scope);
-    }, function(err) {
-      console.log('ServiceWorker registration failed: ', err);
-    });
-  });
-}
+// Handle mobile touch events
+document.addEventListener('touchstart', function() {}, {passive: true});
 </script>
 
 <style>
@@ -332,12 +375,15 @@ if ('serviceWorker' in navigator) {
   --danger: #dc3545;
   --warning: #ffc107;
   --card-bg: rgba(255, 255, 255, 0.1);
+  --mobile-breakpoint: 768px;
+  --small-mobile-breakpoint: 480px;
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -351,6 +397,7 @@ body {
   min-height: 100vh;
   position: relative;
   padding-bottom: 80px;
+  overflow-x: hidden;
 }
 
 @keyframes gradientBG {
@@ -402,6 +449,7 @@ body {
   font-size: 1.2rem;
   text-align: center;
   letter-spacing: 5px;
+  -webkit-appearance: none;
 }
 
 .pin-input:focus {
@@ -419,9 +467,10 @@ body {
   font-size: 1.1rem;
   cursor: pointer;
   transition: background 0.3s;
+  -webkit-appearance: none;
 }
 
-.login-btn:hover {
+.login-btn:hover, .login-btn:active {
   background: #d13453;
 }
 
@@ -432,7 +481,7 @@ body {
 
 .header {
   text-align: center;
-  padding: 20px;
+  padding: 15px 10px;
   position: relative;
   background: rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -440,11 +489,12 @@ body {
 }
 
 h1 {
-  font-size: 2.2rem;
+  font-size: 1.8rem;
   margin-bottom: 10px;
   font-weight: 700;
   text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
   color: #fff;
+  word-wrap: break-word;
 }
 
 .header-controls {
@@ -458,19 +508,23 @@ h1 {
 
 .time-display {
   display: flex;
-  gap: 20px;
+  gap: 15px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .time-item {
   background: var(--card-bg);
-  padding: 8px 15px;
+  padding: 8px 12px;
   border-radius: 10px;
   backdrop-filter: blur(12px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   display: flex;
   align-items: center;
+  flex: 1;
+  min-width: 160px;
+  justify-content: center;
 }
 
 .time-item i {
@@ -480,23 +534,28 @@ h1 {
 
 .control-buttons {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .control-btn {
   background: rgba(255, 255, 255, 0.1);
   color: white;
   border: none;
-  padding: 8px 15px;
+  padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.3s;
   display: flex;
   align-items: center;
   gap: 5px;
+  font-size: 0.9rem;
+  -webkit-appearance: none;
+  touch-action: manipulation;
 }
 
-.control-btn:hover {
+.control-btn:hover, .control-btn:active {
   background: rgba(255, 255, 255, 0.2);
 }
 
@@ -504,7 +563,7 @@ h1 {
   background: rgba(41, 117, 252, 0.7);
 }
 
-.refresh-btn:hover {
+.refresh-btn:hover, .refresh-btn:active {
   background: rgba(41, 117, 252, 1);
 }
 
@@ -512,17 +571,17 @@ h1 {
   background: rgba(220, 53, 69, 0.7);
 }
 
-.logout-btn:hover {
+.logout-btn:hover, .logout-btn:active {
   background: rgba(220, 53, 69, 1);
 }
 
 /* Notifications */
 #notifications-container {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 10px;
+  right: 10px;
   z-index: 1000;
-  max-width: 350px;
+  max-width: calc(100% - 20px);
 }
 
 .notification {
@@ -531,11 +590,12 @@ h1 {
   background: var(--card-bg);
   backdrop-filter: blur(12px);
   border-radius: 8px;
-  padding: 12px 15px;
-  margin-bottom: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   border-left: 4px solid var(--accent);
   animation: slideIn 0.3s ease;
+  max-width: 100%;
 }
 
 .notification.alert {
@@ -543,13 +603,15 @@ h1 {
 }
 
 .notification-icon {
-  margin-right: 10px;
-  font-size: 1.2rem;
+  margin-right: 8px;
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .notification-text {
   flex: 1;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  word-wrap: break-word;
 }
 
 .notification-close {
@@ -558,7 +620,9 @@ h1 {
   color: white;
   font-size: 1.2rem;
   cursor: pointer;
-  margin-left: 10px;
+  margin-left: 8px;
+  flex-shrink: 0;
+  -webkit-appearance: none;
 }
 
 @keyframes slideIn {
@@ -575,19 +639,20 @@ h1 {
 .dashboard {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 15px;
   justify-content: center;
-  padding: 20px;
+  padding: 15px;
   max-width: 1600px;
   margin: 0 auto;
 }
 
 .card {
   background: var(--card-bg);
-  border-radius: 15px;
-  padding: 15px;
+  border-radius: 12px;
+  padding: 12px;
   backdrop-filter: blur(12px);
-  width: 280px;
+  width: 100%;
+  max-width: 300px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -596,7 +661,7 @@ h1 {
 }
 
 .card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-3px);
   box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3);
 }
 
@@ -612,21 +677,23 @@ h1 {
 
 .card h2 {
   text-align: center;
-  font-size: 1.3rem;
-  margin-bottom: 15px;
+  font-size: 1.1rem;
+  margin-bottom: 12px;
   color: #fff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  word-wrap: break-word;
 }
 
 .status-box {
-  padding: 15px;
-  border-radius: 12px;
-  font-size: 1.2rem;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 1rem;
   font-weight: bold;
   text-align: center;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease;
+  word-wrap: break-word;
 }
 
 .on {
@@ -642,22 +709,24 @@ h1 {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
-  margin-top: 10px;
+  font-size: 0.75rem;
+  margin-top: 8px;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
 th, td {
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 8px;
+  padding: 6px;
   text-align: center;
+  word-wrap: break-word;
 }
 
 th {
   background: rgba(0, 0, 0, 0.3);
   font-weight: 600;
+  font-size: 0.7rem;
 }
 
 tr:nth-child(even) {
@@ -676,9 +745,9 @@ tr:nth-child(even) {
 
 footer {
   text-align: center;
-  margin-top: 30px;
-  padding: 15px;
-  font-size: 0.9rem;
+  margin-top: 20px;
+  padding: 12px;
+  font-size: 0.8rem;
   color: var(--text-light);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   background: rgba(0, 0, 0, 0.2);
@@ -688,47 +757,51 @@ footer {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
+  gap: 15px;
   flex-wrap: wrap;
 }
 
 .footer-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
+  font-size: 0.75rem;
 }
 
-/* Responsive Design */
+/* Mobile-First Responsive Design */
 @media (max-width: 768px) {
   .dashboard {
-    padding: 15px;
-    gap: 15px;
+    padding: 10px;
+    gap: 10px;
   }
   
   .card {
-    width: 100%;
-    max-width: 350px;
+    max-width: 100%;
+    padding: 10px;
   }
   
   h1 {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
   }
   
   .header-controls {
     flex-direction: column;
-    gap: 15px;
+    gap: 10px;
   }
   
   .time-display {
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    width: 100%;
   }
   
   .time-item {
     width: 100%;
-    max-width: 300px;
+    max-width: 280px;
     justify-content: center;
+    font-size: 0.8rem;
+    padding: 6px 10px;
   }
   
   .control-buttons {
@@ -738,50 +811,98 @@ footer {
   
   footer {
     flex-direction: column;
-    gap: 10px;
-    padding: 15px 10px;
+    gap: 8px;
+    padding: 10px 5px;
+    font-size: 0.75rem;
   }
   
   #notifications-container {
     position: static;
     max-width: 100%;
-    padding: 0 15px;
+    padding: 0 10px;
+  }
+  
+  .notification {
+    margin-bottom: 6px;
+    padding: 8px 10px;
   }
 }
 
 @media (max-width: 480px) {
   .header {
-    padding: 15px 10px;
+    padding: 10px 5px;
   }
   
   h1 {
-    font-size: 1.6rem;
+    font-size: 1.3rem;
+    margin-bottom: 8px;
   }
   
-  h2 {
-    font-size: 1.2rem;
+  .card h2 {
+    font-size: 1rem;
+    margin-bottom: 10px;
   }
   
   .status-box {
-    font-size: 1.1rem;
-    padding: 12px;
+    font-size: 0.9rem;
+    padding: 10px;
   }
   
   table {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
+  }
+  
+  th, td {
+    padding: 4px;
   }
   
   .time-item {
-    font-size: 0.85rem;
-    padding: 6px 12px;
+    font-size: 0.75rem;
+    padding: 5px 8px;
   }
   
   .login-container {
-    padding: 20px;
+    padding: 20px 15px;
+    margin: 10px;
   }
   
   .login-title {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
+  }
+  
+  .control-btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+  
+  .footer-item {
+    font-size: 0.7rem;
+  }
+}
+
+/* Portrait mode optimization */
+@media (max-width: 768px) and (orientation: portrait) {
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+  
+  .card {
+    max-width: 100%;
+  }
+}
+
+/* Landscape mode optimization for mobile */
+@media (max-width: 900px) and (orientation: landscape) {
+  .dashboard {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  #login-screen {
+    padding: 10px;
+  }
+  
+  .login-container {
+    max-width: 350px;
   }
 }
 
@@ -794,6 +915,13 @@ footer {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+/* Prevent zoom on input focus for mobile */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* Decorative elements */
