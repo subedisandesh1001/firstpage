@@ -135,6 +135,30 @@
             padding: 10px;
             background: rgba(0, 0, 0, 0.3);
             border-top: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .footer-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .visitor-counter {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+        
+        .counter-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #e94560;
         }
         
         button {
@@ -270,7 +294,14 @@
         </div>
 
         <footer>
-            <p>📧 subedisubedi7@gmail.com | 📞 +977-9847877867</p>
+            <div class="footer-info">
+                <p>📧 subedisubedi7@gmail.com</p>
+                <p>📞 +977-9847877867</p>
+            </div>
+            <div class="visitor-counter">
+                <span>Visitors</span>
+                <span class="counter-number" id="visitor-count">0</span>
+            </div>
         </footer>
     </div>
 
@@ -298,7 +329,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, onValue, push, remove, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getDatabase, ref, onValue, push, remove, get, set, increment } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
         // ================= FIREBASE CONFIG ===================
         const firebaseConfig = {
@@ -324,6 +355,31 @@
         const originalTitle = "NEA Substation";
         const lastStatus = {}; // Tracks last known status to prevent logging on refresh
         let initialLoadComplete = false; // Flag to track initial data loading
+
+        // ================= VISITOR COUNTER ===================
+        async function updateVisitorCounter() {
+            try {
+                // Check if this is a new visitor (using sessionStorage)
+                if (!sessionStorage.getItem('visited')) {
+                    const visitorRef = ref(db, 'visitors/count');
+                    
+                    // Use transaction to safely increment the counter
+                    await set(visitorRef, increment(1));
+                    
+                    // Mark this session as visited
+                    sessionStorage.setItem('visited', 'true');
+                }
+                
+                // Always update the display with the current count
+                const visitorRef = ref(db, 'visitors/count');
+                onValue(visitorRef, (snapshot) => {
+                    const count = snapshot.val() || 0;
+                    document.getElementById('visitor-count').textContent = count;
+                });
+            } catch (error) {
+                console.error('Error updating visitor counter:', error);
+            }
+        }
 
         // ================= HELPER FUNCTIONS ===================
         function formatTime(date) {
@@ -429,6 +485,9 @@
         function initDashboard() {
             setInterval(updateClock, 1000);
             updateClock();
+            
+            // Initialize visitor counter
+            updateVisitorCounter();
 
             // Track how many systems have been initialized
             let systemsInitialized = 0;
