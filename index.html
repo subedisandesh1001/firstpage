@@ -29,6 +29,7 @@ const firstLoad = {}; // track first snapshot per system
 let lastReferenceTime = null;
 let isAuthenticated = false;
 let visitorCount = 0;
+let notificationPermission = false;
 
 // Password for authentication (PIN: 1234)
 const CORRECT_PIN = "1234";
@@ -48,6 +49,7 @@ function updateClock() {
 }
 
 function showNotification(message, type = 'info') {
+  // Create in-app notification
   const notification = document.createElement('div');
   notification.className = `notification ${type}`;
   notification.innerHTML = `
@@ -65,18 +67,71 @@ function showNotification(message, type = 'info') {
     }
   }, 5000);
   
-  // Show browser notification if dashboard is not active
-  if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-    new Notification('NEA Substation Alert', {
-      body: message,
-      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iIzFlM2M3MiIvPgo8cGF0aCBkPSJNMzIgMTZWMzJNMzIgNDBWMzZNMzIgMTZMMTggMjhNMzIgMTZMNDYgMjgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo='
-    });
+  // Show browser notification if permission is granted and dashboard is not active
+  if (notificationPermission && (document.hidden || !document.hasFocus())) {
+    showBrowserNotification(message, type);
+  }
+}
+
+function showBrowserNotification(message, type) {
+  if (!("Notification" in window)) {
+    console.log("This browser does not support notifications");
+    return;
+  }
+  
+  const title = type === 'alert' ? '⚠️ NEA Substation Alert' : 'ℹ️ NEA Substation Update';
+  const icon = type === 'alert' ? 
+    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iI2RjMzU0NSIvPgo8cGF0aCBkPSJNMzIgMTZWMzJNMzIgNDBWMzZNMzIgMTZMMTggMjhNMzIgMTZMNDYgMjgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=' :
+    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iIzFlM2M3MiIvPgo8cGF0aCBkPSJNMzIgMTZWMzJNMzIgNDBWMzZNMzIgMTZMMTggMjhNMzIgMTZMNDYgMjgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=';
+  
+  const options = {
+    body: message,
+    icon: icon,
+    badge: icon,
+    tag: 'nea-substation', // Group notifications
+    requireInteraction: type === 'alert', // Keep alert notifications visible until dismissed
+    vibrate: type === 'alert' ? [200, 100, 200] : undefined // Vibrate for alerts
+  };
+  
+  // Show the notification
+  const notification = new Notification(title, options);
+  
+  // Handle notification click
+  notification.onclick = function() {
+    window.focus();
+    notification.close();
+  };
+  
+  // Auto close after 7 seconds for info notifications
+  if (type !== 'alert') {
+    setTimeout(() => {
+      notification.close();
+    }, 7000);
   }
 }
 
 function requestNotificationPermission() {
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+  if (!("Notification" in window)) {
+    console.log("This browser does not support notifications");
+    return;
+  }
+  
+  if (Notification.permission === "granted") {
+    notificationPermission = true;
+    console.log("Notification permission already granted");
+    return;
+  }
+  
+  if (Notification.permission !== "denied") {
+    Notification.requestPermission().then(function(permission) {
+      if (permission === "granted") {
+        notificationPermission = true;
+        console.log("Notification permission granted");
+        showNotification("Browser notifications enabled. You'll be notified of status changes even when this tab is inactive.", "info");
+      } else {
+        console.log("Notification permission denied");
+      }
+    });
   }
 }
 
@@ -143,7 +198,14 @@ async function updateStatus(name, value) {
     const systemName = name === "33kv-system" ? "132 kV System" : 
                       name === "Feeder-1" ? "33 kV System" : 
                       name.replace("Feeder-", "11 kV Feeder-");
-    showNotification(`${systemName} status changed to: ${currentStatus}`, 'alert');
+    
+    const notificationMessage = `${systemName} status changed to: ${currentStatus}`;
+    showNotification(notificationMessage, 'alert');
+    
+    // Update page title if in background
+    if (document.hidden) {
+      document.title = `⚠️ ${systemName} Alert - NEA Substation`;
+    }
   }
 
   lastStatus[name] = currentStatus;
@@ -241,11 +303,22 @@ function refreshPage() {
 
 // Handle page visibility for background notifications
 document.addEventListener('visibilitychange', function() {
-  if (!document.hidden) {
-    // Page is visible again, clear any notifications
+  if (!document.hidden && document.hasFocus()) {
+    // Page is visible again, clear any alert indicators
     document.title = "NEA Substation";
   }
 });
+
+// Service Worker Registration for Persistent Notifications (Optional)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').then(function(registration) {
+      console.log('ServiceWorker registration successful with scope: ', registration.scope);
+    }, function(err) {
+      console.log('ServiceWorker registration failed: ', err);
+    });
+  });
+}
 </script>
 
 <style>
@@ -771,6 +844,9 @@ footer {
     <p class="login-subtitle">Enter PIN to access the dashboard</p>
     <input type="password" id="pin-input" class="pin-input" placeholder="Enter PIN (1234)" maxlength="4" autofocus>
     <button id="login-btn" class="login-btn">Access Dashboard</button>
+    <p style="margin-top: 15px; font-size: 0.8rem; color: #aaa;">
+      Enable browser notifications to receive alerts when the dashboard is minimized
+    </p>
   </div>
 </div>
 
