@@ -6,7 +6,7 @@
 <title>NEA Substation</title>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getDatabase, ref, onValue, push, remove, get, set, update } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+import { getDatabase, ref, onValue, push, remove, get, set, update, onChildAdded } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
 // Firebase Config
 const firebaseConfig = {
@@ -25,7 +25,8 @@ const db = getDatabase(app);
 const systems = ["33kv-system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4", "Feeder-5", "Feeder-6", "Feeder-7"];
 const lastStatus = {};
 const allLogs = {};
-const firstLoad = {}; // track first snapshot per system
+const firstLoad = {};
+const eventCooldown = {}; // Track recent events to prevent duplicates
 let lastReferenceTime = null;
 let isAuthenticated = false;
 let visitorCount = 0;
@@ -35,7 +36,7 @@ let deviceId = null;
 // Password for authentication (PIN: 1234)
 const CORRECT_PIN = "1234";
 
-// Generate unique device ID to prevent duplicate logs
+// Generate unique device ID
 function generateDeviceId() {
   if (!deviceId) {
     deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
@@ -44,7 +45,6 @@ function generateDeviceId() {
   return deviceId;
 }
 
-// Get existing device ID or generate new one
 function getDeviceId() {
   if (!deviceId) {
     deviceId = localStorage.getItem('neaDeviceId') || generateDeviceId();
@@ -67,7 +67,6 @@ function updateClock() {
 }
 
 function showNotification(message, type = 'info') {
-  // Create in-app notification
   const notification = document.createElement('div');
   notification.className = `notification ${type}`;
   notification.innerHTML = `
@@ -78,76 +77,41 @@ function showNotification(message, type = 'info') {
   
   document.getElementById('notifications-container').appendChild(notification);
   
-  // Auto remove after 5 seconds
   setTimeout(() => {
     if (notification.parentElement) {
       notification.remove();
     }
   }, 5000);
   
-  // Show browser notification if permission is granted and dashboard is not active
   if (notificationPermission && (document.hidden || !document.hasFocus())) {
     showBrowserNotification(message, type);
   }
 }
 
 function showBrowserNotification(message, type) {
-  if (!("Notification" in window)) {
-    console.log("This browser does not support notifications");
-    return;
-  }
+  if (!("Notification" in window)) return;
   
   const title = type === 'alert' ? '⚠️ NEA Substation Alert' : 'ℹ️ NEA Substation Update';
-  const icon = type === 'alert' ? 
-    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iI2RjMzU0NSIvPgo8cGF0aCBkPSJNMzIgMTZWMzJNMzIgNDBWMzZNMzIgMTZMMTggMjhNMzIgMTZMNDYgMjgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=' :
-    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iIzFlM2M3MiIvPgo8cGF0aCBkPSJNMzIgMTZWMzJNMzIgNDBWMzZNMzIgMTZMMTggMjhNMzIgMTZMNDYgMjgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=';
   
   const options = {
     body: message,
-    icon: icon,
-    badge: icon,
-    tag: 'nea-substation',
-    requireInteraction: type === 'alert',
-    vibrate: type === 'alert' ? [200, 100, 200] : undefined
+    tag: 'nea-substation'
   };
   
-  // Show the notification
-  const notification = new Notification(title, options);
-  
-  // Handle notification click
-  notification.onclick = function() {
-    window.focus();
-    notification.close();
-  };
-  
-  // Auto close after 7 seconds for info notifications
-  if (type !== 'alert') {
-    setTimeout(() => {
-      notification.close();
-    }, 7000);
+  if (Notification.permission === "granted") {
+    new Notification(title, options);
   }
 }
 
 function requestNotificationPermission() {
-  if (!("Notification" in window)) {
-    console.log("This browser does not support notifications");
-    return;
-  }
+  if (!("Notification" in window)) return;
   
   if (Notification.permission === "granted") {
     notificationPermission = true;
-    console.log("Notification permission already granted");
-    return;
-  }
-  
-  if (Notification.permission !== "denied") {
+  } else if (Notification.permission !== "denied") {
     Notification.requestPermission().then(function(permission) {
       if (permission === "granted") {
         notificationPermission = true;
-        console.log("Notification permission granted");
-        showNotification("Browser notifications enabled. You'll be notified of status changes even when this tab is inactive.", "info");
-      } else {
-        console.log("Notification permission denied");
       }
     });
   }
@@ -176,16 +140,9 @@ function authenticate() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     
-    // Generate device ID
     getDeviceId();
-    
-    // Initialize dashboard
     initDashboard();
-    
-    // Update visitor count
     updateVisitorCount();
-    
-    // Request notification permission
     requestNotificationPermission();
     
     showNotification('Authentication successful. Welcome to NEA Substation Dashboard.', 'info');
@@ -194,6 +151,61 @@ function authenticate() {
     pinInput.value = '';
     pinInput.focus();
   }
+}
+
+// Centralized event logging to prevent duplicates
+async function logSystemEvent(system, status) {
+  const now = new Date();
+  const eventKey = `${system}_${status}_${Math.floor(now.getTime() / 5000)}`; // Group events in 5-second windows
+  
+  // Check if this event was already processed recently
+  if (eventCooldown[eventKey]) {
+    return; // Skip if same event was processed recently
+  }
+  
+  // Set cooldown for this event type
+  eventCooldown[eventKey] = true;
+  setTimeout(() => {
+    delete eventCooldown[eventKey];
+  }, 10000); // 10 second cooldown
+  
+  const logRef = ref(db, "logs/" + system);
+  const nowFormatted = formatTime(now);
+  
+  // Check if this exact event already exists
+  const snap = await get(logRef);
+  const logs = snap.val() ? Object.entries(snap.val()) : [];
+  
+  // Look for recent duplicate events (same status within 30 seconds)
+  const recentDuplicate = logs.find(([key, log]) => {
+    const logTime = new Date(log.time.replace(/(\d+)\/(\d+)\/(\d+), (.+)/, '$2/$1/$3 $4'));
+    const timeDiff = now.getTime() - logTime.getTime();
+    return log.status === status && timeDiff < 30000; // 30 seconds window
+  });
+  
+  if (recentDuplicate) {
+    console.log('Skipping duplicate event:', system, status);
+    return; // Skip if duplicate found
+  }
+  
+  // Keep max 10 events (increased for better history)
+  if (logs.length >= 10) {
+    // Remove oldest events beyond limit
+    const eventsToRemove = logs.slice(0, logs.length - 9);
+    for (const [key] of eventsToRemove) {
+      await remove(ref(db, `logs/${system}/${key}`));
+    }
+  }
+  
+  // Add new event with device info
+  await push(logRef, { 
+    time: nowFormatted, 
+    status: status,
+    device: getDeviceId().substring(0, 8), // Short device identifier
+    timestamp: now.getTime()
+  });
+  
+  console.log('Event logged:', system, status);
 }
 
 async function updateStatus(name, value) {
@@ -213,7 +225,8 @@ async function updateStatus(name, value) {
 
   // Only log after first load and if status changed
   if (firstLoad[name] && lastStatus[name] !== currentStatus) {
-    await logEvent(name, currentStatus);
+    // Use centralized logging function
+    await logSystemEvent(name, currentStatus);
     
     // Show notification for status change
     const systemName = name === "33kv-system" ? "132 kV System" : 
@@ -230,36 +243,7 @@ async function updateStatus(name, value) {
   }
 
   lastStatus[name] = currentStatus;
-  firstLoad[name] = true; // mark first load complete
-}
-
-async function logEvent(system, status) {
-  const now = formatTime(new Date());
-  const logRef = ref(db, "logs/" + system);
-
-  const snap = await get(logRef);
-  let logs = snap.val() ? Object.entries(snap.val()) : [];
-
-  // Check if this device already logged this event recently (within 2 seconds)
-  const recentLogs = logs.filter(([key, log]) => {
-    return log.status === status && 
-           Date.now() - new Date(log.time.replace(/(\d+)\/(\d+)\/(\d+), (.+)/, '$2/$1/$3 $4')).getTime() < 2000;
-  });
-
-  // If no recent logs with same status, add new log
-  if (recentLogs.length === 0) {
-    // Keep max 5 events
-    if (logs.length >= 5) {
-      const oldestKey = logs[0][0];
-      await remove(ref(db, `logs/${system}/${oldestKey}`));
-    }
-
-    await push(logRef, { 
-      time: now, 
-      status: status,
-      deviceId: getDeviceId() // Track which device created the log
-    });
-  }
+  firstLoad[name] = true;
 }
 
 function showLogs(system) {
@@ -269,36 +253,40 @@ function showLogs(system) {
   onValue(logRef, (snap) => {
     tableBody.innerHTML = "";
     const logs = snap.val();
-    allLogs[system] = logs ? Object.values(logs).reverse() : [];
-
+    
     if (!logs) {
       tableBody.innerHTML = "<tr><td colspan='2'>No events yet</td></tr>";
       return;
     }
 
-    // Filter to show only unique events (remove duplicates from same time/status)
-    const uniqueLogs = [];
-    const seenLogs = new Set();
+    // Convert to array and sort by timestamp (newest first)
+    const logArray = Object.values(logs);
+    logArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     
-    allLogs[system].forEach(log => {
-      const logKey = `${log.time}-${log.status}`;
-      if (!seenLogs.has(logKey)) {
-        seenLogs.add(logKey);
-        uniqueLogs.push(log);
-      }
-    });
-
     // Display only the latest 5 unique logs
-    uniqueLogs.slice(0, 5).forEach(log => {
-      const row = document.createElement("tr");
-      row.innerHTML = `<td>${log.time}</td><td>${log.status}</td>`;
-      const latestStatus = uniqueLogs[0].status;
-      if ((system === "33kv-system" && latestStatus === "System_Fail") ||
-          (system !== "33kv-system" && latestStatus === "OFF/TRIP")) {
-        row.classList.add("blink-red");
+    const displayedLogs = new Set();
+    let count = 0;
+    
+    for (const log of logArray) {
+      if (count >= 5) break;
+      
+      const logKey = `${log.time}-${log.status}`;
+      if (!displayedLogs.has(logKey)) {
+        displayedLogs.add(logKey);
+        
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${log.time}</td><td>${log.status}</td>`;
+        
+        // Highlight if system is in failure state
+        if ((system === "33kv-system" && log.status === "System_Fail") ||
+            (system !== "33kv-system" && log.status === "OFF/TRIP")) {
+          row.classList.add("blink-red");
+        }
+        
+        tableBody.appendChild(row);
+        count++;
       }
-      tableBody.appendChild(row);
-    });
+    }
   });
 }
 
@@ -330,10 +318,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Add click event to login button
   document.getElementById('login-btn').addEventListener('click', authenticate);
-  
-  // Auto-focus on PIN input
   document.getElementById('pin-input').focus();
 });
 
@@ -352,15 +337,14 @@ function refreshPage() {
   window.location.reload();
 }
 
-// Handle page visibility for background notifications
+// Handle page visibility
 document.addEventListener('visibilitychange', function() {
   if (!document.hidden && document.hasFocus()) {
-    // Page is visible again, clear any alert indicators
     document.title = "NEA Substation";
   }
 });
 
-// Handle mobile touch events
+// Mobile touch support
 document.addEventListener('touchstart', function() {}, {passive: true});
 </script>
 
@@ -375,8 +359,6 @@ document.addEventListener('touchstart', function() {}, {passive: true});
   --danger: #dc3545;
   --warning: #ffc107;
   --card-bg: rgba(255, 255, 255, 0.1);
-  --mobile-breakpoint: 768px;
-  --small-mobile-breakpoint: 480px;
 }
 
 * {
@@ -406,7 +388,7 @@ body {
   100% { background-position: 0% 50%; }
 }
 
-/* Login Screen Styles */
+/* Login Screen */
 #login-screen {
   display: flex;
   justify-content: center;
@@ -474,7 +456,7 @@ body {
   background: #d13453;
 }
 
-/* Dashboard Styles */
+/* Dashboard */
 #dashboard {
   display: none;
 }
@@ -482,17 +464,14 @@ body {
 .header {
   text-align: center;
   padding: 15px 10px;
-  position: relative;
   background: rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 h1 {
   font-size: 1.8rem;
   margin-bottom: 10px;
   font-weight: 700;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
   color: #fff;
   word-wrap: break-word;
 }
@@ -518,7 +497,6 @@ h1 {
   padding: 8px 12px;
   border-radius: 10px;
   backdrop-filter: blur(12px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   font-size: 0.85rem;
   display: flex;
   align-items: center;
@@ -546,33 +524,19 @@ h1 {
   padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.3s;
   display: flex;
   align-items: center;
   gap: 5px;
   font-size: 0.9rem;
   -webkit-appearance: none;
-  touch-action: manipulation;
-}
-
-.control-btn:hover, .control-btn:active {
-  background: rgba(255, 255, 255, 0.2);
 }
 
 .refresh-btn {
   background: rgba(41, 117, 252, 0.7);
 }
 
-.refresh-btn:hover, .refresh-btn:active {
-  background: rgba(41, 117, 252, 1);
-}
-
 .logout-btn {
   background: rgba(220, 53, 69, 0.7);
-}
-
-.logout-btn:hover, .logout-btn:active {
-  background: rgba(220, 53, 69, 1);
 }
 
 /* Notifications */
@@ -592,7 +556,6 @@ h1 {
   border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   border-left: 4px solid var(--accent);
   animation: slideIn 0.3s ease;
   max-width: 100%;
@@ -605,13 +568,11 @@ h1 {
 .notification-icon {
   margin-right: 8px;
   font-size: 1.1rem;
-  flex-shrink: 0;
 }
 
 .notification-text {
   flex: 1;
   font-size: 0.85rem;
-  word-wrap: break-word;
 }
 
 .notification-close {
@@ -620,9 +581,6 @@ h1 {
   color: white;
   font-size: 1.2rem;
   cursor: pointer;
-  margin-left: 8px;
-  flex-shrink: 0;
-  -webkit-appearance: none;
 }
 
 @keyframes slideIn {
@@ -642,8 +600,6 @@ h1 {
   gap: 15px;
   justify-content: center;
   padding: 15px;
-  max-width: 1600px;
-  margin: 0 auto;
 }
 
 .card {
@@ -654,25 +610,7 @@ h1 {
   width: 100%;
   max-width: 300px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  position: relative;
-  overflow: hidden;
-}
-
-.card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3);
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--accent), var(--secondary));
 }
 
 .card h2 {
@@ -680,7 +618,6 @@ h1 {
   font-size: 1.1rem;
   margin-bottom: 12px;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   word-wrap: break-word;
 }
 
@@ -691,8 +628,6 @@ h1 {
   font-weight: bold;
   text-align: center;
   margin-bottom: 12px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
   word-wrap: break-word;
 }
 
@@ -713,7 +648,6 @@ table {
   margin-top: 8px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 6px;
-  overflow: hidden;
 }
 
 th, td {
@@ -725,12 +659,7 @@ th, td {
 
 th {
   background: rgba(0, 0, 0, 0.3);
-  font-weight: 600;
   font-size: 0.7rem;
-}
-
-tr:nth-child(even) {
-  background: rgba(255, 255, 255, 0.05);
 }
 
 @keyframes blink {
@@ -748,8 +677,6 @@ footer {
   margin-top: 20px;
   padding: 12px;
   font-size: 0.8rem;
-  color: var(--text-light);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   background: rgba(0, 0, 0, 0.2);
   position: absolute;
   bottom: 0;
@@ -768,7 +695,7 @@ footer {
   font-size: 0.75rem;
 }
 
-/* Mobile-First Responsive Design */
+/* Mobile Responsive */
 @media (max-width: 768px) {
   .dashboard {
     padding: 10px;
@@ -777,7 +704,6 @@ footer {
   
   .card {
     max-width: 100%;
-    padding: 10px;
   }
   
   h1 {
@@ -791,7 +717,6 @@ footer {
   
   .time-display {
     flex-direction: column;
-    align-items: center;
     gap: 8px;
     width: 100%;
   }
@@ -799,32 +724,12 @@ footer {
   .time-item {
     width: 100%;
     max-width: 280px;
-    justify-content: center;
-    font-size: 0.8rem;
-    padding: 6px 10px;
-  }
-  
-  .control-buttons {
-    width: 100%;
-    justify-content: center;
   }
   
   footer {
     flex-direction: column;
     gap: 8px;
     padding: 10px 5px;
-    font-size: 0.75rem;
-  }
-  
-  #notifications-container {
-    position: static;
-    max-width: 100%;
-    padding: 0 10px;
-  }
-  
-  .notification {
-    margin-bottom: 6px;
-    padding: 8px 10px;
   }
 }
 
@@ -835,86 +740,20 @@ footer {
   
   h1 {
     font-size: 1.3rem;
-    margin-bottom: 8px;
   }
   
   .card h2 {
     font-size: 1rem;
-    margin-bottom: 10px;
   }
   
   .status-box {
     font-size: 0.9rem;
-    padding: 10px;
-  }
-  
-  table {
-    font-size: 0.7rem;
-  }
-  
-  th, td {
-    padding: 4px;
-  }
-  
-  .time-item {
-    font-size: 0.75rem;
-    padding: 5px 8px;
   }
   
   .login-container {
     padding: 20px 15px;
     margin: 10px;
   }
-  
-  .login-title {
-    font-size: 1.6rem;
-  }
-  
-  .control-btn {
-    padding: 6px 10px;
-    font-size: 0.8rem;
-  }
-  
-  .footer-item {
-    font-size: 0.7rem;
-  }
-}
-
-/* Portrait mode optimization */
-@media (max-width: 768px) and (orientation: portrait) {
-  .dashboard {
-    grid-template-columns: 1fr;
-  }
-  
-  .card {
-    max-width: 100%;
-  }
-}
-
-/* Landscape mode optimization for mobile */
-@media (max-width: 900px) and (orientation: landscape) {
-  .dashboard {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  #login-screen {
-    padding: 10px;
-  }
-  
-  .login-container {
-    max-width: 350px;
-  }
-}
-
-/* Utility classes */
-.text-center {
-  text-align: center;
-}
-
-.flex-center {
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
 /* Prevent zoom on input focus for mobile */
@@ -923,48 +762,9 @@ footer {
     font-size: 16px !important;
   }
 }
-
-/* Decorative elements */
-.corner-decoration {
-  position: absolute;
-  width: 150px;
-  height: 150px;
-  opacity: 0.05;
-  pointer-events: none;
-}
-
-.top-left {
-  top: 0;
-  left: 0;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
-}
-
-.top-right {
-  top: 0;
-  right: 0;
-  background: radial-gradient(circle, var(--success) 0%, transparent 70%);
-}
-
-.bottom-left {
-  bottom: 0;
-  left: 0;
-  background: radial-gradient(circle, var(--warning) 0%, transparent 70%);
-}
-
-.bottom-right {
-  bottom: 0;
-  right: 0;
-  background: radial-gradient(circle, var(--secondary) 0%, transparent 70%);
-}
 </style>
 </head>
 <body>
-<!-- Decorative background elements -->
-<div class="corner-decoration top-left"></div>
-<div class="corner-decoration top-right"></div>
-<div class="corner-decoration bottom-left"></div>
-<div class="corner-decoration bottom-right"></div>
-
 <!-- Login Screen -->
 <div id="login-screen">
   <div class="login-container">
@@ -972,9 +772,6 @@ footer {
     <p class="login-subtitle">Enter PIN to access the dashboard</p>
     <input type="password" id="pin-input" class="pin-input" placeholder="Enter PIN (1234)" maxlength="4" autofocus>
     <button id="login-btn" class="login-btn">Access Dashboard</button>
-    <p style="margin-top: 15px; font-size: 0.8rem; color: #aaa;">
-      Enable browser notifications to receive alerts when the dashboard is minimized
-    </p>
   </div>
 </div>
 
@@ -1019,7 +816,6 @@ footer {
       </table>
     </div>
 
-    <!-- Feeders 1-7 -->
     <div class="card">
       <h2>33 kV System</h2>
       <div id="Feeder-1" class="status-box">--</div>
