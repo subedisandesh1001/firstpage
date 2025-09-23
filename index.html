@@ -12,10 +12,10 @@ import { getDatabase, ref, onValue, push, remove, get } from "https://www.gstati
 // ================= FIREBASE CONFIG ===================
 const firebaseConfig = {
   apiKey: "AIzaSyBa1Gb5uDd8-Rjue5VxTE7kOQ9O2n-2xbI",
-  authDomain: "https://feeders-status-21646.firebaseapp.com",
+  authDomain: "feeders-status-21646.firebaseapp.com",
   databaseURL: "https://feeders-status-21646-default-rtdb.firebaseio.com/",
-  projectId: "https://feeders-status-21646",
-  storageBucket: "https://feeders-status-21646.appspot.com",
+  projectId: "feeders-status-21646",
+  storageBucket: "feeders-status-21646.appspot.com",
   messagingSenderId: "YOUR_SENDER_ID",
   appId: "YOUR_APP_ID"
 };
@@ -31,114 +31,109 @@ let notificationPermission = false;
 let lastReferenceTime = null;
 let blinkInterval = null;
 const originalTitle = "NEA Substation";
-const lastStatus = {}; // Store last known status to detect changes
+const lastStatus = {}; // Tracks last known status to prevent logging on refresh
 
 // ================= HELPER FUNCTIONS ===================
-function formatTime(date) {
-  return new Intl.DateTimeFormat('en-GB', {
-    year:'numeric', month:'2-digit', day:'2-digit',
-    hour:'2-digit', minute:'2-digit', second:'2-digit',
+function formatTime(date){
+  return new Intl.DateTimeFormat('en-GB',{
+    year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',
     hour12:true
   }).format(date);
 }
 
-function updateClock() {
+function updateClock(){
   const now = new Date();
   document.getElementById('current-time').textContent = formatTime(now);
   if(lastReferenceTime) document.getElementById('last-ref-time').textContent = formatTime(lastReferenceTime);
 }
 
 // Browser notification
-function showBrowserNotification(message) {
-  if (!("Notification" in window)) return;
-  if(Notification.permission === "granted") new Notification("NEA Substation Alert", {body: message});
+function showBrowserNotification(message){
+  if(!("Notification" in window)) return;
+  if(Notification.permission === "granted") new Notification("NEA Substation Alert",{body:message});
 }
 
-function requestNotificationPermission() {
-  if (!("Notification" in window)) return;
-  if(Notification.permission !== "granted" && Notification.permission !== "denied") {
-    Notification.requestPermission().then(p => { if(p==="granted") notificationPermission=true; });
-  } else if(Notification.permission === "granted") notificationPermission=true;
+function requestNotificationPermission(){
+  if(!("Notification" in window)) return;
+  if(Notification.permission!=="granted" && Notification.permission!=="denied"){
+    Notification.requestPermission().then(p=>{ if(p==="granted") notificationPermission=true; });
+  } else if(Notification.permission==="granted") notificationPermission=true;
 }
 
 // Tab title blinking
-function startBlinkingTitle(alertText) {
+function startBlinkingTitle(alertText){
   if(blinkInterval) return;
-  let visible = true;
-  blinkInterval = setInterval(() => {
-    document.title = visible ? alertText : originalTitle;
-    visible = !visible;
-  }, 1000);
+  let visible=true;
+  blinkInterval=setInterval(()=>{
+    document.title=visible?alertText:originalTitle;
+    visible=!visible;
+  },1000);
 }
 
-function stopBlinkingTitle() {
+function stopBlinkingTitle(){
   if(blinkInterval){
     clearInterval(blinkInterval);
-    blinkInterval = null;
-    document.title = originalTitle;
+    blinkInterval=null;
+    document.title=originalTitle;
   }
 }
 
-// Update system status & log events only on change
-async function updateStatus(name, value) {
+// ================= STATUS & EVENT LOG ===================
+async function updateStatus(name,value){
   const box = document.getElementById(name);
   if(!box) return;
 
-  let status = value === 1 ? (name==="33kv-system"?"LIVE":"ON") : (name==="33kv-system"?"System_Fail":"OFF/TRIP");
-  box.innerText = status;
-  lastReferenceTime = new Date();
+  let status = value===1?(name==="33kv-system"?"LIVE":"ON"):(name==="33kv-system"?"System_Fail":"OFF/TRIP");
+  box.innerText=status;
+  lastReferenceTime=new Date();
   updateClock();
 
-  if(status==="System_Fail" || status==="OFF/TRIP") {
-    box.className = "status-box off blink-red";
+  if(status==="System_Fail"||status==="OFF/TRIP"){
+    box.className="status-box off blink-red";
     if(notificationPermission) showBrowserNotification(`${name} status: ${status}`);
     startBlinkingTitle(`⚠️ ${name} ${status}`);
   } else {
-    box.className = "status-box on";
+    box.className="status-box on";
     stopBlinkingTitle();
   }
 
-  // ================ LOG EVENT TO FIREBASE ONLY ON CHANGE =================
-  if(lastStatus[name] !== status){
-    lastStatus[name] = status;
-
-    const logRef = ref(db, 'logs/' + name);
+  // Only log if actual change (prevent logging on page load)
+  if(lastStatus.hasOwnProperty(name) && lastStatus[name]!==status){
+    lastStatus[name]=status;
+    const logRef = ref(db,'logs/'+name);
     const nowFormatted = formatTime(new Date());
+    await push(logRef,{time:nowFormatted,status:status,timestamp:Date.now()});
 
-    // Push new event
-    await push(logRef, {time: nowFormatted, status: status, timestamp: Date.now()});
-
-    // Remove oldest events if more than 10
-    get(logRef).then(snapshot => {
+    // Keep max 10 events per system
+    get(logRef).then(snapshot=>{
       const logs = snapshot.val();
       if(logs){
         const keys = Object.keys(logs);
-        if(keys.length > 10){
-          const keysToRemove = keys.slice(0, keys.length - 10);
-          keysToRemove.forEach(k => remove(ref(db, `logs/${name}/${k}`)));
+        if(keys.length>10){
+          const keysToRemove = keys.slice(0, keys.length-10);
+          keysToRemove.forEach(k=>remove(ref(db,`logs/${name}/${k}`)));
         }
       }
     });
+  } else {
+    // Initialize lastStatus on first load without logging
+    lastStatus[name]=status;
   }
 }
 
-// ================== DASHBOARD INIT =====================
-function initDashboard() {
-  setInterval(updateClock, 1000);
+// ================= DASHBOARD INIT ===================
+function initDashboard(){
+  setInterval(updateClock,1000);
   updateClock();
-
-  systems.forEach(sys => {
-    const sysRef = ref(db, sys);
-    onValue(sysRef, snap => updateStatus(sys, snap.val()));
+  systems.forEach(sys=>{
+    const sysRef=ref(db,sys);
+    onValue(sysRef,snap=>updateStatus(sys,snap.val()));
   });
-
-  // Show events overlay when Events tab is clicked
-  document.getElementById('events-tab-btn').addEventListener('click', ()=>showEventsOverlay());
-  document.getElementById('close-events-btn').addEventListener('click', ()=>document.getElementById('events-overlay').style.display='none');
 }
 
-// ================== AUTHENTICATION =====================
-function authenticate() {
+// ================= AUTHENTICATION ===================
+function authenticate(){
   const pin = document.getElementById('pin-input').value;
   if(pin===CORRECT_PIN){
     isAuthenticated=true;
@@ -146,14 +141,13 @@ function authenticate() {
     document.getElementById('dashboard').style.display='block';
     requestNotificationPermission();
     initDashboard();
-  } else {
+  } else{
     alert("Invalid PIN");
     document.getElementById('pin-input').value='';
     document.getElementById('pin-input').focus();
   }
 }
 
-// Logout & refresh
 function logout(){
   isAuthenticated=false;
   document.getElementById('login-screen').style.display='flex';
@@ -164,39 +158,43 @@ function logout(){
 
 function refreshPage(){ window.location.reload(); }
 
-// ================== SHOW EVENTS OVERLAY =====================
-function showEventsOverlay(){
-  const container = document.getElementById('events-container');
-  container.innerHTML = '';
-  document.getElementById('events-overlay').style.display='flex';
+// ================= EVENTS TAB ===================
+function openEventsTab(){
+  const tab = document.getElementById('events-tab');
+  tab.style.display='block';
+  loadAllEvents();
+}
 
+function closeEventsTab(){
+  const tab = document.getElementById('events-tab');
+  tab.style.display='none';
+}
+
+function loadAllEvents(){
+  const tbody = document.getElementById('events-body');
+  tbody.innerHTML='';
   systems.forEach(sys=>{
-    const logRef = ref(db, 'logs/' + sys);
-    get(logRef).then(snap=>{
+    const logRef = ref(db,'logs/'+sys);
+    onValue(logRef,snap=>{
       const logs = snap.val();
-      const card = document.createElement('div');
-      card.className='card';
-      card.innerHTML=`<h2>${sys} Events</h2>`;
-      const table = document.createElement('table');
-      table.innerHTML='<tr><th>Time</th><th>Status</th></tr>';
       if(logs){
-        const logArray = Object.values(logs).sort((a,b)=>b.timestamp-a.timestamp);
+        const logArray = Object.values(logs);
+        logArray.sort((a,b)=>b.timestamp-a.timestamp);
+        tbody.innerHTML='';
         logArray.forEach(log=>{
-          const row = document.createElement('tr');
-          row.innerHTML=`<td>${log.time}</td><td>${log.status}</td>`;
-          table.appendChild(row);
+          const row=document.createElement('tr');
+          row.innerHTML=`<td>${sys}</td><td>${log.time}</td><td>${log.status}</td>`;
+          tbody.appendChild(row);
         });
       }
-      card.appendChild(table);
-      container.appendChild(card);
     });
   });
 }
 
-// ================= DOM EVENTS =====================
+// DOM Events
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('login-btn').addEventListener('click',authenticate);
-  document.getElementById('pin-input').addEventListener('keypress', e => { if(e.key==="Enter") authenticate(); });
+  document.getElementById('pin-input').addEventListener('keypress',e=>{ if(e.key==="Enter") authenticate(); });
 });
 </script>
 
@@ -210,32 +208,21 @@ body{font-family:Arial,sans-serif;margin:0;padding:0;color:#fff;background:#1621
 #dashboard{display:none}
 .header{text-align:center;padding:15px;background:rgba(0,0,0,0.3)}
 .dashboard{display:flex;flex-wrap:wrap;justify-content:center;gap:15px;padding:15px}
-.card{background:rgba(255,255,255,0.1);padding:10px;border-radius:8px;width:260px;text-align:center;margin-bottom:10px}
+.card{background:rgba(255,255,255,0.1);padding:10px;border-radius:8px;width:260px;text-align:center}
 .status-box{padding:12px;font-weight:bold;border-radius:6px;text-align:center;font-size:1.1rem;transition: all 0.3s ease;}
 .on{background:green}
 .off{background:red}
-/* Enhanced blinking animation for OFF/TRIP or System_Fail */
-@keyframes blink-red-animation {
-  0%, 100% { background-color: red; color: white; transform: scale(1);}
-  50% { background-color: darkred; color: white; transform: scale(1.05);}
-}
-.blink-red{animation: blink-red-animation 1s infinite;}
+@keyframes blink-red-animation {0%,100%{background-color:red;color:white;transform:scale(1);}50%{background-color:darkred;color:white;transform:scale(1.05);}}
+.blink-red{animation:blink-red-animation 1s infinite;}
 footer{text-align:center;margin-top:20px;padding:10px;background:rgba(0,0,0,0.3)}
-.events-overlay{
-  display:none;
-  position:fixed;
-  top:0;left:0;width:100%;height:100%;
-  background:rgba(0,0,0,0.95);
-  flex-direction:column;
-  overflow-y:auto;
-  padding:20px;
-  z-index:9999;
-}
-.events-container{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
-table{width:100%;border-collapse:collapse;margin-top:5px;color:#fff}
-th,td{border:1px solid rgba(255,255,255,0.3);padding:6px;text-align:center}
-th{background:rgba(0,0,0,0.4)}
-#close-events-btn{position:fixed;top:15px;right:15px;padding:10px 15px;background:#e94560;border:none;color:white;font-weight:bold;cursor:pointer;border-radius:5px;z-index:10000}
+button{cursor:pointer;}
+
+/* Events Tab */
+#events-tab{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);overflow:auto;color:white;z-index:1000;padding:20px}
+#events-tab table{width:100%;border-collapse:collapse;margin-top:10px}
+#events-tab th, #events-tab td{border:1px solid #fff;padding:5px;text-align:center}
+#events-tab th{background:#444}
+#close-events-btn{background:#e94560;color:white;padding:8px;border:none;border-radius:5px;cursor:pointer;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -257,7 +244,7 @@ th{background:rgba(0,0,0,0.4)}
     <p>Current Time: <span id="current-time">--:--</span> | Last Update: <span id="last-ref-time">--:--</span></p>
     <button onclick="refreshPage()">🔄 Refresh</button>
     <button onclick="logout()">🚪 Logout</button>
-    <button id="events-tab-btn">📋 Events</button>
+    <button onclick="openEventsTab()">📜 Events</button>
   </div>
 
   <div class="dashboard">
@@ -265,10 +252,10 @@ th{background:rgba(0,0,0,0.4)}
     <div class="card"><h2>33 kV System</h2><div id="Feeder-1" class="status-box">--</div></div>
     <div class="card"><h2>11 kV Feeder-2</h2><div id="Feeder-2" class="status-box">--</div></div>
     <div class="card"><h2>11 kV Feeder-3</h2><div id="Feeder-3" class="status-box">--</div></div>
-    <div class="card"><h2>11 KV Feeder-4</h2><div id="Feeder-4" class="status-box">--</div></div>
-    <div class="card"><h2>11 KV Feeder-5</h2><div id="Feeder-5" class="status-box">--</div></div>
-    <div class="card"><h2>11 KV Feeder-6</h2><div id="Feeder-6" class="status-box">--</div></div>
-    <div class="card"><h2>11 KV Feeder-7</h2><div id="Feeder-7" class="status-box">--</div></div>
+    <div class="card"><h2>Feeder-4</h2><div id="Feeder-4" class="status-box">--</div></div>
+    <div class="card"><h2>Feeder-5</h2><div id="Feeder-5" class="status-box">--</div></div>
+    <div class="card"><h2>Feeder-6</h2><div id="Feeder-6" class="status-box">--</div></div>
+    <div class="card"><h2>Feeder-7</h2><div id="Feeder-7" class="status-box">--</div></div>
   </div>
 
   <footer>
@@ -276,11 +263,15 @@ th{background:rgba(0,0,0,0.4)}
   </footer>
 </div>
 
-<!-- EVENTS OVERLAY -->
-<div class="events-overlay" id="events-overlay">
-  <button id="close-events-btn">✖ Close</button>
-  <div class="events-container" id="events-container"></div>
+<!-- EVENTS TAB -->
+<div id="events-tab">
+  <button id="close-events-btn" onclick="closeEventsTab()">✖ Close Events</button>
+  <table>
+    <thead>
+      <tr><th>System</th><th>Time</th><th>Status</th></tr>
+    </thead>
+    <tbody id="events-body"></tbody>
+  </table>
 </div>
-
 </body>
 </html>
