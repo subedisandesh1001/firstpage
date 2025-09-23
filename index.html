@@ -64,6 +64,20 @@ function showNotification(message, type = 'info') {
       notification.remove();
     }
   }, 5000);
+  
+  // Show browser notification if dashboard is not active
+  if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+    new Notification('NEA Substation Alert', {
+      body: message,
+      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iIzFlM2M3MiIvPgo8cGF0aCBkPSJNMzIgMTZWMzJNMzIgNDBWMzZNMzIgMTZMMTggMjhNMzIgMTZMNDYgMjgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo='
+    });
+  }
+}
+
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 }
 
 function updateVisitorCount() {
@@ -95,6 +109,9 @@ function authenticate() {
     // Update visitor count
     updateVisitorCount();
     
+    // Request notification permission
+    requestNotificationPermission();
+    
     showNotification('Authentication successful. Welcome to NEA Substation Dashboard.', 'info');
   } else {
     showNotification('Invalid PIN. Please try again.', 'alert');
@@ -123,7 +140,9 @@ async function updateStatus(name, value) {
     await logEvent(name, currentStatus);
     
     // Show notification for status change
-    const systemName = name === "33kv-system" ? "33kV System" : name;
+    const systemName = name === "33kv-system" ? "132 kV System" : 
+                      name === "Feeder-1" ? "33 kV System" : 
+                      name.replace("Feeder-", "11 kV Feeder-");
     showNotification(`${systemName} status changed to: ${currentStatus}`, 'alert');
   }
 
@@ -201,6 +220,9 @@ document.addEventListener('DOMContentLoaded', function() {
       authenticate();
     }
   });
+  
+  // Add click event to login button
+  document.getElementById('login-btn').addEventListener('click', authenticate);
 });
 
 // Logout function
@@ -211,6 +233,19 @@ function logout() {
   document.getElementById('pin-input').value = '';
   showNotification('You have been logged out.', 'info');
 }
+
+// Refresh page function
+function refreshPage() {
+  window.location.reload();
+}
+
+// Handle page visibility for background notifications
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    // Page is visible again, clear any notifications
+    document.title = "NEA Substation";
+  }
+});
 </script>
 
 <style>
@@ -370,14 +405,38 @@ h1 {
   color: var(--accent);
 }
 
-.logout-btn {
-  background: rgba(220, 53, 69, 0.7);
+.control-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.control-btn {
+  background: rgba(255, 255, 255, 0.1);
   color: white;
   border: none;
   padding: 8px 15px;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.refresh-btn {
+  background: rgba(41, 117, 252, 0.7);
+}
+
+.refresh-btn:hover {
+  background: rgba(41, 117, 252, 1);
+}
+
+.logout-btn {
+  background: rgba(220, 53, 69, 0.7);
 }
 
 .logout-btn:hover {
@@ -599,6 +658,11 @@ footer {
     justify-content: center;
   }
   
+  .control-buttons {
+    width: 100%;
+    justify-content: center;
+  }
+  
   footer {
     flex-direction: column;
     gap: 10px;
@@ -705,8 +769,8 @@ footer {
   <div class="login-container">
     <h1 class="login-title">⚡ NEA Substation</h1>
     <p class="login-subtitle">Enter PIN to access the dashboard</p>
-    <input type="password" id="pin-input" class="pin-input" placeholder="Enter PIN" maxlength="4" autofocus>
-    <button class="login-btn" onclick="authenticate()">Access Dashboard</button>
+    <input type="password" id="pin-input" class="pin-input" placeholder="Enter PIN (1234)" maxlength="4" autofocus>
+    <button id="login-btn" class="login-btn">Access Dashboard</button>
   </div>
 </div>
 
@@ -726,7 +790,14 @@ footer {
           <i>🔄</i> Last Update: <span id="last-ref-time">--:--:--</span>
         </div>
       </div>
-      <button class="logout-btn" onclick="logout()">Logout</button>
+      <div class="control-buttons">
+        <button class="control-btn refresh-btn" onclick="refreshPage()">
+          <i>🔄</i> Refresh
+        </button>
+        <button class="control-btn logout-btn" onclick="logout()">
+          <i>🚪</i> Logout
+        </button>
+      </div>
     </div>
   </div>
 
@@ -746,7 +817,7 @@ footer {
 
     <!-- Feeders 1-7 -->
     <div class="card">
-      <h2>33 KV System</h2>
+      <h2>33 kV System</h2>
       <div id="Feeder-1" class="status-box">--</div>
       <table>
         <thead>
@@ -759,7 +830,7 @@ footer {
     </div>
     
     <div class="card">
-      <h2>11 KV Feeder-2</h2>
+      <h2>11 kV Feeder-2</h2>
       <div id="Feeder-2" class="status-box">--</div>
       <table>
         <thead>
@@ -772,7 +843,7 @@ footer {
     </div>
     
     <div class="card">
-      <h2>11 KV Feeder-3</h2>
+      <h2>11 kV Feeder-3</h2>
       <div id="Feeder-3" class="status-box">--</div>
       <table>
         <thead>
