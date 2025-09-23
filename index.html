@@ -26,7 +26,7 @@ const systems = ["33kv-system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4", 
 const lastStatus = {};
 const allLogs = {};
 const firstLoad = {};
-const eventCooldown = {}; // Track recent events to prevent duplicates
+const recentEvents = new Set(); // Track events across all devices
 let lastReferenceTime = null;
 let isAuthenticated = false;
 let visitorCount = 0;
@@ -153,55 +153,52 @@ function authenticate() {
   }
 }
 
-// Centralized event logging to prevent duplicates
+// Global event tracking to prevent duplicates across devices
 async function logSystemEvent(system, status) {
   const now = new Date();
-  const eventKey = `${system}_${status}_${Math.floor(now.getTime() / 5000)}`; // Group events in 5-second windows
+  const eventKey = `${system}_${status}_${Math.floor(now.getTime() / 10000)}`; // 10-second window
   
-  // Check if this event was already processed recently
-  if (eventCooldown[eventKey]) {
-    return; // Skip if same event was processed recently
+  // Check if this event was already processed globally
+  const eventsRef = ref(db, 'recentEvents/' + eventKey);
+  const eventSnap = await get(eventsRef);
+  
+  if (eventSnap.exists()) {
+    console.log('Event already logged by another device:', system, status);
+    return; // Event already logged by another device
   }
   
-  // Set cooldown for this event type
-  eventCooldown[eventKey] = true;
-  setTimeout(() => {
-    delete eventCooldown[eventKey];
-  }, 10000); // 10 second cooldown
+  // Mark this event as processed globally (expires in 15 seconds)
+  await set(eventsRef, {
+    system: system,
+    status: status,
+    timestamp: now.getTime(),
+    device: getDeviceId()
+  });
+  
+  // Set expiration for the event marker
+  setTimeout(async () => {
+    await remove(eventsRef);
+  }, 15000);
   
   const logRef = ref(db, "logs/" + system);
   const nowFormatted = formatTime(now);
   
-  // Check if this exact event already exists
   const snap = await get(logRef);
   const logs = snap.val() ? Object.entries(snap.val()) : [];
   
-  // Look for recent duplicate events (same status within 30 seconds)
-  const recentDuplicate = logs.find(([key, log]) => {
-    const logTime = new Date(log.time.replace(/(\d+)\/(\d+)\/(\d+), (.+)/, '$2/$1/$3 $4'));
-    const timeDiff = now.getTime() - logTime.getTime();
-    return log.status === status && timeDiff < 30000; // 30 seconds window
-  });
-  
-  if (recentDuplicate) {
-    console.log('Skipping duplicate event:', system, status);
-    return; // Skip if duplicate found
-  }
-  
-  // Keep max 10 events (increased for better history)
+  // Keep max 10 events
   if (logs.length >= 10) {
-    // Remove oldest events beyond limit
     const eventsToRemove = logs.slice(0, logs.length - 9);
     for (const [key] of eventsToRemove) {
       await remove(ref(db, `logs/${system}/${key}`));
     }
   }
   
-  // Add new event with device info
+  // Add new event
   await push(logRef, { 
     time: nowFormatted, 
     status: status,
-    device: getDeviceId().substring(0, 8), // Short device identifier
+    device: getDeviceId().substring(0, 8),
     timestamp: now.getTime()
   });
   
@@ -217,7 +214,22 @@ async function updateStatus(name, value) {
     : (name === "33kv-system" ? "System_Fail" : "OFF/TRIP");
 
   box.innerText = currentStatus;
-  box.className = (currentStatus === "System_Fail" || currentStatus === "OFF/TRIP") ? "status-box off blink-red" : "status-box on";
+  
+  // Apply blinking only for failure states
+  if (currentStatus === "System_Fail" || currentStatus === "OFF/TRIP") {
+    box.className = "status-box off blink-red";
+    
+    // Also blink the browser tab title
+    if (document.hidden || !document.hasFocus()) {
+      blinkTabTitle(name, currentStatus);
+    }
+  } else {
+    box.className = "status-box on";
+    // Reset tab title when status is normal
+    if (!document.hidden && document.hasFocus()) {
+      document.title = "NEA Substation";
+    }
+  }
 
   // Update last reference time
   lastReferenceTime = new Date();
@@ -225,25 +237,36 @@ async function updateStatus(name, value) {
 
   // Only log after first load and if status changed
   if (firstLoad[name] && lastStatus[name] !== currentStatus) {
-    // Use centralized logging function
     await logSystemEvent(name, currentStatus);
     
-    // Show notification for status change
     const systemName = name === "33kv-system" ? "132 kV System" : 
                       name === "Feeder-1" ? "33 kV System" : 
                       name.replace("Feeder-", "11 kV Feeder-");
     
     const notificationMessage = `${systemName} status changed to: ${currentStatus}`;
     showNotification(notificationMessage, 'alert');
-    
-    // Update page title if in background
-    if (document.hidden) {
-      document.title = `⚠️ ${systemName} Alert - NEA Substation`;
-    }
   }
 
   lastStatus[name] = currentStatus;
   firstLoad[name] = true;
+}
+
+// Blink browser tab title for alert states
+function blinkTabTitle(systemName, status) {
+  let blinkState = true;
+  const systemDisplayName = systemName === "33kv-system" ? "132kV" : 
+                           systemName === "Feeder-1" ? "33kV" : 
+                           systemName.replace("Feeder-", "Feeder");
+  
+  const blinkInterval = setInterval(() => {
+    if (document.hidden || !document.hasFocus()) {
+      document.title = blinkState ? `⚠️ ${systemDisplayName} ${status}` : "NEA Substation";
+      blinkState = !blinkState;
+    } else {
+      document.title = "NEA Substation";
+      clearInterval(blinkInterval);
+    }
+  }, 1000);
 }
 
 function showLogs(system) {
@@ -263,29 +286,23 @@ function showLogs(system) {
     const logArray = Object.values(logs);
     logArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     
-    // Display only the latest 5 unique logs
-    const displayedLogs = new Set();
-    let count = 0;
+    // Get current status to determine if we should blink
+    const currentStatus = lastStatus[system];
+    const shouldBlink = (system === "33kv-system" && currentStatus === "System_Fail") ||
+                       (system !== "33kv-system" && currentStatus === "OFF/TRIP");
     
-    for (const log of logArray) {
-      if (count >= 5) break;
+    // Display latest 5 logs
+    for (let i = 0; i < Math.min(5, logArray.length); i++) {
+      const log = logArray[i];
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${log.time}</td><td>${log.status}</td>`;
       
-      const logKey = `${log.time}-${log.status}`;
-      if (!displayedLogs.has(logKey)) {
-        displayedLogs.add(logKey);
-        
-        const row = document.createElement("tr");
-        row.innerHTML = `<td>${log.time}</td><td>${log.status}</td>`;
-        
-        // Highlight if system is in failure state
-        if ((system === "33kv-system" && log.status === "System_Fail") ||
-            (system !== "33kv-system" && log.status === "OFF/TRIP")) {
-          row.classList.add("blink-red");
-        }
-        
-        tableBody.appendChild(row);
-        count++;
+      // Blink only if it's a failure event AND system is currently in failure state
+      if (shouldBlink && (log.status === "System_Fail" || log.status === "OFF/TRIP")) {
+        row.classList.add("blink-red");
       }
+      
+      tableBody.appendChild(row);
     }
   });
 }
@@ -329,6 +346,7 @@ function logout() {
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('pin-input').value = '';
   document.getElementById('pin-input').focus();
+  document.title = "NEA Substation"; // Reset title on logout
   showNotification('You have been logged out.', 'info');
 }
 
@@ -340,7 +358,7 @@ function refreshPage() {
 // Handle page visibility
 document.addEventListener('visibilitychange', function() {
   if (!document.hidden && document.hasFocus()) {
-    document.title = "NEA Substation";
+    document.title = "NEA Substation"; // Reset title when page becomes active
   }
 });
 
@@ -629,6 +647,7 @@ h1 {
   text-align: center;
   margin-bottom: 12px;
   word-wrap: break-word;
+  transition: all 0.3s ease;
 }
 
 .on {
@@ -639,6 +658,23 @@ h1 {
 .off {
   background: var(--danger);
   color: white;
+}
+
+/* Enhanced blinking animation for alerts */
+@keyframes blink-alert {
+  0%, 50% { 
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.8);
+  }
+  51%, 100% { 
+    opacity: 0.7;
+    box-shadow: 0 0 5px rgba(220, 53, 69, 0.4);
+  }
+}
+
+.blink-red {
+  animation: blink-alert 1s infinite;
+  background-color: var(--danger) !important;
 }
 
 table {
@@ -660,16 +696,6 @@ th, td {
 th {
   background: rgba(0, 0, 0, 0.3);
   font-size: 0.7rem;
-}
-
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0.6; }
-}
-
-.blink-red {
-  animation: blink 1s infinite;
-  background-color: rgba(220, 53, 69, 0.8) !important;
 }
 
 footer {
