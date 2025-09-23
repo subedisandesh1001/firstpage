@@ -32,6 +32,7 @@ let lastReferenceTime = null;
 let blinkInterval = null;
 const originalTitle = "NEA Substation";
 const lastStatus = {}; // Tracks last known status to prevent logging on refresh
+let initialLoadComplete = false; // Flag to track initial data loading
 
 // ================= HELPER FUNCTIONS ===================
 function formatTime(date){
@@ -80,7 +81,7 @@ function stopBlinkingTitle(){
 }
 
 // ================= STATUS & EVENT LOG ===================
-async function updateStatus(name,value){
+async function updateStatus(name, value, isInitialLoad = false) {
   const box = document.getElementById(name);
   if(!box) return;
 
@@ -99,8 +100,10 @@ async function updateStatus(name,value){
   }
 
   // Only log if actual change (prevent logging on page load)
-  if(lastStatus.hasOwnProperty(name) && lastStatus[name]!==status){
-    lastStatus[name]=status;
+  // Skip logging during initial load or if status hasn't actually changed
+  if(!isInitialLoad && lastStatus.hasOwnProperty(name) && lastStatus[name] !== status){
+    console.log(`Status change detected for ${name}: ${lastStatus[name]} -> ${status}`);
+    lastStatus[name] = status;
     const logRef = ref(db,'logs/'+name);
     const nowFormatted = formatTime(new Date());
     await push(logRef,{time:nowFormatted,status:status,timestamp:Date.now()});
@@ -118,7 +121,10 @@ async function updateStatus(name,value){
     });
   } else {
     // Initialize lastStatus on first load without logging
-    lastStatus[name]=status;
+    if (!lastStatus.hasOwnProperty(name)) {
+      console.log(`Initial status for ${name}: ${status}`);
+      lastStatus[name] = status;
+    }
   }
 }
 
@@ -126,9 +132,24 @@ async function updateStatus(name,value){
 function initDashboard(){
   setInterval(updateClock,1000);
   updateClock();
+  
+  // Track how many systems have been initialized
+  let systemsInitialized = 0;
+  
   systems.forEach(sys=>{
     const sysRef=ref(db,sys);
-    onValue(sysRef,snap=>updateStatus(sys,snap.val()));
+    onValue(sysRef,snap=>{
+      // First time we get data for each system, mark it as initial load
+      const isInitial = !initialLoadComplete || !lastStatus.hasOwnProperty(sys);
+      updateStatus(sys, snap.val(), isInitial);
+      
+      systemsInitialized++;
+      // When all systems have been initialized at least once, mark initial load as complete
+      if (systemsInitialized >= systems.length && !initialLoadComplete) {
+        initialLoadComplete = true;
+        console.log("Initial load complete. Now tracking actual changes.");
+      }
+    });
   });
 }
 
@@ -173,17 +194,38 @@ function closeEventsTab(){
 function loadAllEvents(){
   const tbody = document.getElementById('events-body');
   tbody.innerHTML='';
+  
+  // Collect all events from all systems
+  let allEvents = [];
+  let systemsProcessed = 0;
+  
   systems.forEach(sys=>{
     const logRef = ref(db,'logs/'+sys);
-    onValue(logRef,snap=>{
+    get(logRef).then(snap=>{
       const logs = snap.val();
       if(logs){
-        const logArray = Object.values(logs);
-        logArray.sort((a,b)=>b.timestamp-a.timestamp);
+        Object.values(logs).forEach(log=>{
+          allEvents.push({
+            system: sys,
+            time: log.time,
+            status: log.status,
+            timestamp: log.timestamp
+          });
+        });
+      }
+      
+      systemsProcessed++;
+      
+      // When all systems have been processed, sort and display events
+      if(systemsProcessed === systems.length){
+        // Sort by timestamp (newest first)
+        allEvents.sort((a,b)=>b.timestamp-a.timestamp);
+        
+        // Clear and populate table
         tbody.innerHTML='';
-        logArray.forEach(log=>{
+        allEvents.forEach(event=>{
           const row=document.createElement('tr');
-          row.innerHTML=`<td>${sys}</td><td>${log.time}</td><td>${log.status}</td>`;
+          row.innerHTML=`<td>${event.system}</td><td>${event.time}</td><td>${event.status}</td>`;
           tbody.appendChild(row);
         });
       }
