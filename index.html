@@ -334,18 +334,6 @@
                 <h2>Feeder-4</h2>
                 <div id="Feeder-4" class="status-box">--</div>
             </div>
-            <div class="card">
-                <h2>Feeder-5</h2>
-                <div id="Feeder-5" class="status-box">--</div>
-            </div>
-            <div class="card">
-                <h2>Feeder-6</h2>
-                <div id="Feeder-6" class="status-box">--</div>
-            </div>
-            <div class="card">
-                <h2>Feeder-7</h2>
-                <div id="Feeder-7" class="status-box">--</div>
-            </div>
         </div>
 
         <footer>
@@ -401,7 +389,8 @@
         const db = getDatabase(app);
 
         // ================= GLOBAL VARIABLES ===================
-        const systems = ["33kv-system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4", "Feeder-5", "Feeder-6", "Feeder-7"];
+        // Reduced to only 4 feeders
+        const systems = ["33kv-system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4"];
         const CORRECT_PIN = "1234";
         let isAuthenticated = false;
         let notificationPermission = false;
