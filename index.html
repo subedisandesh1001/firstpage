@@ -389,34 +389,36 @@
         const db = getDatabase(app);
 
         // ================= GLOBAL VARIABLES ===================
-        // Reduced to only 4 feeders
-        const systems = ["33kv-system", "Feeder-1", "Feeder-2", "Feeder-3", "Feeder-4"];
+        // System mapping: Firebase ID -> Display Name
+        const systems = {
+            "33kv-system": "132 kV System",
+            "Feeder-1": "11 kV INCOMER", 
+            "Feeder-2": "11 kV ASHNIYA-1",
+            "Feeder-3": "11 kV RAMAWAPUR-2",
+            "Feeder-4": "SPARE FEEDER-3"
+        };
+        
+        const systemIds = Object.keys(systems); // Get just the IDs for Firebase references
+        
         const CORRECT_PIN = "1234";
         let isAuthenticated = false;
         let notificationPermission = false;
-        let notificationsEnabled = true; // Default to enabled
+        let notificationsEnabled = true;
         let lastReferenceTime = null;
         let blinkInterval = null;
         const originalTitle = "NEA Substation";
-        const lastStatus = {}; // Tracks last known status to prevent logging on refresh
-        let initialLoadComplete = false; // Flag to track initial data loading
-        let serviceWorkerRegistration = null;
+        const lastStatus = {};
+        let initialLoadComplete = false;
 
         // ================= VISITOR COUNTER ===================
         async function updateVisitorCounter() {
             try {
-                // Check if this is a new visitor (using sessionStorage)
                 if (!sessionStorage.getItem('visited')) {
                     const visitorRef = ref(db, 'visitors/count');
-                    
-                    // Use transaction to safely increment the counter
                     await set(visitorRef, increment(1));
-                    
-                    // Mark this session as visited
                     sessionStorage.setItem('visited', 'true');
                 }
                 
-                // Always update the display with the current count
                 const visitorRef = ref(db, 'visitors/count');
                 onValue(visitorRef, (snapshot) => {
                     const count = snapshot.val() || 0;
@@ -432,25 +434,21 @@
             if (!("Notification" in window) || !notificationsEnabled) return;
             
             if (Notification.permission === "granted") {
-                // Create notification with tag to avoid duplicates
                 const notification = new Notification(title, {
                     body: message,
                     icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iIzE2MjEzZSIvPgo8cGF0aCBkPSJNMzIgMTZDMzYuNDE4MyAxNiA0MCAxOS41ODE3IDQwIDI0VjM0QzQwIDM2LjIwMTUgNDEuMjQzOCAzOC4wNjA1IDQzLjE2MTQgMzguNzA0N0w0NCA0MkgyMEM0MCAzOC4wNjA1IDIzLjI0MzggMzYuMjAxNSAyMy4xNjE0IDM0LjcwNDdMMjQgMzRWMjRDMjQgMTkuNTgxNyAyNy41ODE3IDE2IDMyIDE2WiIgZmlsbD0iI2U5NDU2MCIvPgo8Y2lyY2xlIGN4PSIzMiIgY3k9IjQ4IiByPSI0IiBmaWxsPSIjZTk0NTYwIi8+Cjwvc3ZnPgo=',
                     tag: tag || 'nea-notification',
-                    requireInteraction: true, // Keep notification visible until user interacts
-                    silent: false // Enable sound if supported
+                    requireInteraction: true,
+                    silent: false
                 });
                 
-                // Play notification sound if available
                 playNotificationSound();
                 
-                // Focus on the tab when notification is clicked
                 notification.onclick = function() {
                     window.focus();
                     this.close();
                 };
                 
-                // Auto-close notification after 10 seconds (longer for background)
                 setTimeout(() => {
                     if (notification) notification.close();
                 }, 10000);
@@ -458,7 +456,6 @@
         }
 
         function playNotificationSound() {
-            // Create a simple notification sound using Web Audio API
             try {
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const oscillator = audioContext.createOscillator();
@@ -495,7 +492,6 @@
             if (!("Notification" in window)) return;
             
             if (Notification.permission === "default") {
-                // Show permission prompt
                 document.getElementById('notification-permission-prompt').style.display = 'block';
                 updateNotificationStatus();
             } else if (Notification.permission === "granted") {
@@ -540,14 +536,10 @@
         // ================= PAGE VISIBILITY API ===================
         function handleVisibilityChange() {
             if (document.hidden) {
-                // Page is in background - ensure notifications will work
-                console.log("Page is in background - notifications active");
                 document.getElementById('background-status').textContent = "Monitoring";
             } else {
-                // Page is visible
-                console.log("Page is visible");
                 document.getElementById('background-status').textContent = "Active";
-                stopBlinkingTitle(); // Stop blinking when user returns to page
+                stopBlinkingTitle();
             }
         }
 
@@ -570,7 +562,6 @@
             if (lastReferenceTime) document.getElementById('last-ref-time').textContent = formatTime(lastReferenceTime);
         }
 
-        // Tab title blinking
         function startBlinkingTitle(alertText) {
             if (blinkInterval) return;
             let visible = true;
@@ -589,11 +580,12 @@
         }
 
         // ================= STATUS & EVENT LOG ===================
-        async function updateStatus(name, value, isInitialLoad = false) {
-            const box = document.getElementById(name);
+        async function updateStatus(systemId, value, isInitialLoad = false) {
+            const box = document.getElementById(systemId);
             if (!box) return;
 
-            let status = value === 1 ? (name === "33kv-system" ? "LIVE" : "ON") : (name === "33kv-system" ? "System_Fail" : "OFF/TRIP");
+            const systemName = systems[systemId];
+            let status = value === 1 ? (systemId === "33kv-system" ? "LIVE" : "ON") : (systemId === "33kv-system" ? "System_Fail" : "OFF/TRIP");
             box.innerText = status;
             lastReferenceTime = new Date();
             updateClock();
@@ -601,28 +593,25 @@
             if (status === "System_Fail" || status === "OFF/TRIP") {
                 box.className = "status-box off blink-red";
                 
-                // Show browser notification for status changes (even in background)
-                if (!isInitialLoad && lastStatus.hasOwnProperty(name) && lastStatus[name] !== status) {
+                if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
                     showBrowserNotification(
                         "⚠️ CRITICAL ALERT - NEA Substation", 
-                        `${name} status changed to: ${status}`,
-                        `critical-${name}-${Date.now()}`
+                        `${systemName} status changed to: ${status}`,
+                        `critical-${systemId}-${Date.now()}`
                     );
                     
-                    // Start blinking title if page is visible
                     if (!document.hidden) {
-                        startBlinkingTitle(`⚠️ ${name} ${status}`);
+                        startBlinkingTitle(`⚠️ ${systemName} ${status}`);
                     }
                 }
             } else {
                 box.className = "status-box on";
                 
-                // Show browser notification for status changes (ON/LIVE)
-                if (!isInitialLoad && lastStatus.hasOwnProperty(name) && lastStatus[name] !== status) {
+                if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
                     showBrowserNotification(
                         "✅ System Update - NEA Substation", 
-                        `${name} status changed to: ${status}`,
-                        `update-${name}-${Date.now()}`
+                        `${systemName} status changed to: ${status}`,
+                        `update-${systemId}-${Date.now()}`
                     );
                 }
                 
@@ -631,13 +620,22 @@
                 }
             }
 
-            // Only log if actual change (prevent logging on page load)
-            if (!isInitialLoad && lastStatus.hasOwnProperty(name) && lastStatus[name] !== status) {
-                console.log(`Status change detected for ${name}: ${lastStatus[name]} -> ${status}`);
-                lastStatus[name] = status;
-                const logRef = ref(db, 'logs/' + name);
+            // Save event log with proper system name
+            if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
+                console.log(`Status change detected for ${systemName}: ${lastStatus[systemId]} -> ${status}`);
+                lastStatus[systemId] = status;
+                
+                const logRef = ref(db, 'logs/' + systemId);
                 const nowFormatted = formatTime(new Date());
-                await push(logRef, { time: nowFormatted, status: status, timestamp: Date.now() });
+                
+                // Save with display name instead of technical ID
+                await push(logRef, { 
+                    system: systemName, // Save the display name
+                    time: nowFormatted, 
+                    status: status, 
+                    timestamp: Date.now(),
+                    systemId: systemId // Keep the ID for reference
+                });
 
                 // Keep max 10 events per system
                 get(logRef).then(snapshot => {
@@ -646,15 +644,14 @@
                         const keys = Object.keys(logs);
                         if (keys.length > 10) {
                             const keysToRemove = keys.slice(0, keys.length - 10);
-                            keysToRemove.forEach(k => remove(ref(db, `logs/${name}/${k}`)));
+                            keysToRemove.forEach(k => remove(ref(db, `logs/${systemId}/${k}`)));
                         }
                     }
                 });
             } else {
-                // Initialize lastStatus on first load without logging
-                if (!lastStatus.hasOwnProperty(name)) {
-                    console.log(`Initial status for ${name}: ${status}`);
-                    lastStatus[name] = status;
+                if (!lastStatus.hasOwnProperty(systemId)) {
+                    console.log(`Initial status for ${systemName}: ${status}`);
+                    lastStatus[systemId] = status;
                 }
             }
         }
@@ -664,25 +661,20 @@
             setInterval(updateClock, 1000);
             updateClock();
             
-            // Initialize visitor counter
             updateVisitorCounter();
 
-            // Set up page visibility detection
             document.addEventListener('visibilitychange', handleVisibilityChange);
             
-            // Track how many systems have been initialized
             let systemsInitialized = 0;
 
-            systems.forEach(sys => {
-                const sysRef = ref(db, sys);
+            systemIds.forEach(systemId => {
+                const sysRef = ref(db, systemId);
                 onValue(sysRef, snap => {
-                    // First time we get data for each system, mark it as initial load
-                    const isInitial = !initialLoadComplete || !lastStatus.hasOwnProperty(sys);
-                    updateStatus(sys, snap.val(), isInitial);
+                    const isInitial = !initialLoadComplete || !lastStatus.hasOwnProperty(systemId);
+                    updateStatus(systemId, snap.val(), isInitial);
 
                     systemsInitialized++;
-                    // When all systems have been initialized at least once, mark initial load as complete
-                    if (systemsInitialized >= systems.length && !initialLoadComplete) {
+                    if (systemsInitialized >= systemIds.length && !initialLoadComplete) {
                         initialLoadComplete = true;
                         console.log("Initial load complete. Now tracking actual changes.");
                     }
@@ -734,18 +726,17 @@
             const tbody = document.getElementById('events-body');
             tbody.innerHTML = '';
 
-            // Collect all events from all systems
             let allEvents = [];
             let systemsProcessed = 0;
 
-            systems.forEach(sys => {
-                const logRef = ref(db, 'logs/' + sys);
+            systemIds.forEach(systemId => {
+                const logRef = ref(db, 'logs/' + systemId);
                 get(logRef).then(snap => {
                     const logs = snap.val();
                     if (logs) {
                         Object.values(logs).forEach(log => {
                             allEvents.push({
-                                system: sys,
+                                system: log.system || systems[systemId], // Use saved name or fallback
                                 time: log.time,
                                 status: log.status,
                                 timestamp: log.timestamp
@@ -755,12 +746,9 @@
 
                     systemsProcessed++;
 
-                    // When all systems have been processed, sort and display events
-                    if (systemsProcessed === systems.length) {
-                        // Sort by timestamp (newest first)
+                    if (systemsProcessed === systemIds.length) {
                         allEvents.sort((a, b) => b.timestamp - a.timestamp);
 
-                        // Clear and populate table
                         tbody.innerHTML = '';
                         if (allEvents.length === 0) {
                             const row = document.createElement('tr');
@@ -785,23 +773,16 @@
                 if (e.key === "Enter") authenticate();
             });
             
-            // Notification permission button
             document.getElementById('enable-notifications').addEventListener('click', enableNotifications);
-            
-            // Notification toggle
             document.getElementById('notification-toggle').addEventListener('change', toggleNotifications);
-            
-            // Fixed event listeners for dashboard buttons
             document.getElementById('refresh-btn').addEventListener('click', refreshPage);
             document.getElementById('logout-btn').addEventListener('click', logout);
             document.getElementById('events-btn').addEventListener('click', openEventsTab);
             document.getElementById('close-events-btn').addEventListener('click', closeEventsTab);
             
-            // Initialize notification status
             updateNotificationStatus();
         });
 
-        // Make functions globally available for HTML onclick handlers
         window.openEventsTab = openEventsTab;
         window.closeEventsTab = closeEventsTab;
         window.refreshPage = refreshPage;
