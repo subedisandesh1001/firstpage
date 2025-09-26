@@ -248,6 +248,38 @@
             color: #aaa;
         }
         
+        .events-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .events-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .last-update {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+        
+        .update-events-btn {
+            background: #4CAF50;
+            margin-left: 10px;
+        }
+        
+        .update-events-btn:hover {
+            background: #45a049;
+        }
+        
+        .update-events-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
         /* Notification styles */
         .notification-permission {
             background: #0f3460;
@@ -352,7 +384,15 @@
     <div id="events-tab">
         <div class="events-container">
             <button id="close-events-btn">✖ Close Events</button>
-            <h2>Event Log</h2>
+            <div class="events-header">
+                <div class="events-title">
+                    <h2>📜 Event Log</h2>
+                </div>
+                <div class="last-update">
+                    Last updated: <span id="events-last-update">--:--</span>
+                    <button id="update-events-btn" class="update-events-btn">🔄 Update Events</button>
+                </div>
+            </div>
             <table>
                 <thead>
                     <tr>
@@ -389,7 +429,6 @@
         const db = getDatabase(app);
 
         // ================= GLOBAL VARIABLES ===================
-        // System mapping: Firebase ID -> Display Name
         const systems = {
             "33kv-system": "132 kV System",
             "Feeder-1": "11 kV INCOMER", 
@@ -398,8 +437,7 @@
             "Feeder-4": "SPARE FEEDER-3"
         };
         
-        const systemIds = Object.keys(systems); // Get just the IDs for Firebase references
-        
+        const systemIds = Object.keys(systems);
         const CORRECT_PIN = "1234";
         let isAuthenticated = false;
         let notificationPermission = false;
@@ -409,6 +447,8 @@
         const originalTitle = "NEA Substation";
         const lastStatus = {};
         let initialLoadComplete = false;
+        let lastEventsUpdate = null;
+        let isUpdatingEvents = false;
 
         // ================= VISITOR COUNTER ===================
         async function updateVisitorCounter() {
@@ -436,7 +476,7 @@
             if (Notification.permission === "granted") {
                 const notification = new Notification(title, {
                     body: message,
-                    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iIzE2MjEzZSIvPgo8cGF0aCBkPSJNMzIgMTZDMzYuNDE4MyAxNiA0MCAxOS41ODE3IDQwIDI0VjM0QzQwIDM2LjIwMTUgNDEuMjQzOCAzOC4wNjA1IDQzLjE2MTQgMzguNzA0N0w0NCA0MkgyMEM0MCAzOC4wNjA1IDIzLjI0MzggMzYuMjAxNSAyMy4xNjE0IDM0LjcwNDdMMjQgMzRWMjRDMjQgMTkuNTgxNyAyNy41ODE3IDE2IDMyIDE2WiIgZmlsbD0iI2U5NDU2MCIvPgo8Y2lyY2xlIGN4PSIzMiIgY3k9IjQ4IiByPSI0IiBmaWxsPSIjZTk0NTYwIi8+Cjwvc3ZnPgo=',
+                    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iIzE2MjEzZSIvPgo8cGF0aCBkPSJNMzIgMTZDMzYuNDE4MyAxNiA0MCAxOS41ODE3IDQwIDI0VjM0QzQwIDM2LjIwMTUgNDEuMjQzOCAzOC4wNjA1IDQzLjE2MTQgMzguNzA0N3M0IDQyTDIwIDQyQzIwIDM4LjA2MDUgMjMuMjQzOCAzNi4yMDE1IDIzLjE2MTQgMzQuNzA0N0wyNCAzNFYyNEMyNCAxOS41ODE3IDI3LjU4MTcgMTYgMzIgMTZaIiBmaWxsPSIjZTk0NTYwIi8+CjxyZWN0IHg9IjI4IiB5PSI0NCIgd2lkdGg9IjgiIGhlaWdodD0iOCIgcng9IjQiIGZpbGw9IiNlOTQ1NjAiLz4KPC9zdmc+',
                     tag: tag || 'nea-notification',
                     requireInteraction: true,
                     silent: false
@@ -556,6 +596,22 @@
             }).format(date);
         }
 
+        function formatTimestamp(timestamp) {
+            // Convert ESP8266 timestamp (milliseconds) to readable time
+            if (!timestamp) return '--:--';
+            
+            // If timestamp is in milliseconds (from ESP8266 millis())
+            if (timestamp > 1000000000000) {
+                // It's already a proper timestamp
+                return formatTime(new Date(timestamp));
+            } else {
+                // It's from ESP8266 millis() - convert to actual time
+                const currentTime = new Date();
+                const eventTime = new Date(currentTime - (Date.now() - timestamp));
+                return formatTime(eventTime);
+            }
+        }
+
         function updateClock() {
             const now = new Date();
             document.getElementById('current-time').textContent = formatTime(now);
@@ -577,6 +633,11 @@
                 blinkInterval = null;
                 document.title = originalTitle;
             }
+        }
+
+        function updateEventsLastUpdate() {
+            lastEventsUpdate = new Date();
+            document.getElementById('events-last-update').textContent = formatTime(lastEventsUpdate);
         }
 
         // ================= STATUS & EVENT LOG ===================
@@ -630,11 +691,11 @@
                 
                 // Save with display name instead of technical ID
                 await push(logRef, { 
-                    system: systemName, // Save the display name
+                    system: systemName,
                     time: nowFormatted, 
                     status: status, 
                     timestamp: Date.now(),
-                    systemId: systemId // Keep the ID for reference
+                    systemId: systemId
                 });
 
                 // Keep max 10 events per system
@@ -662,7 +723,6 @@
             updateClock();
             
             updateVisitorCounter();
-
             document.addEventListener('visibilitychange', handleVisibilityChange);
             
             let systemsInitialized = 0;
@@ -710,11 +770,12 @@
             window.location.reload();
         }
 
-        // ================= EVENTS TAB ===================
+        // ================= EVENTS TAB FUNCTIONS ===================
         function openEventsTab() {
             const tab = document.getElementById('events-tab');
             tab.style.display = 'block';
             loadAllEvents();
+            updateEventsLastUpdate();
         }
 
         function closeEventsTab() {
@@ -722,46 +783,85 @@
             tab.style.display = 'none';
         }
 
+        async function updateEvents() {
+            if (isUpdatingEvents) return;
+            
+            isUpdatingEvents = true;
+            const updateBtn = document.getElementById('update-events-btn');
+            updateBtn.disabled = true;
+            updateBtn.textContent = '🔄 Updating...';
+            
+            try {
+                await loadAllEvents();
+                updateEventsLastUpdate();
+                showBrowserNotification("NEA Substation", "Events updated successfully!");
+            } catch (error) {
+                console.error('Error updating events:', error);
+            } finally {
+                isUpdatingEvents = false;
+                updateBtn.disabled = false;
+                updateBtn.textContent = '🔄 Update Events';
+            }
+        }
+
         function loadAllEvents() {
-            const tbody = document.getElementById('events-body');
-            tbody.innerHTML = '';
+            return new Promise((resolve, reject) => {
+                const tbody = document.getElementById('events-body');
+                tbody.innerHTML = '<tr><td colspan="3" class="no-events">Loading events...</td></tr>';
 
-            let allEvents = [];
-            let systemsProcessed = 0;
+                let allEvents = [];
+                let systemsProcessed = 0;
 
-            systemIds.forEach(systemId => {
-                const logRef = ref(db, 'logs/' + systemId);
-                get(logRef).then(snap => {
-                    const logs = snap.val();
-                    if (logs) {
-                        Object.values(logs).forEach(log => {
-                            allEvents.push({
-                                system: log.system || systems[systemId], // Use saved name or fallback
-                                time: log.time,
-                                status: log.status,
-                                timestamp: log.timestamp
-                            });
-                        });
-                    }
-
-                    systemsProcessed++;
-
-                    if (systemsProcessed === systemIds.length) {
-                        allEvents.sort((a, b) => b.timestamp - a.timestamp);
-
-                        tbody.innerHTML = '';
-                        if (allEvents.length === 0) {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `<td colspan="3" class="no-events">No events to display</td>`;
-                            tbody.appendChild(row);
-                        } else {
-                            allEvents.forEach(event => {
-                                const row = document.createElement('tr');
-                                row.innerHTML = `<td>${event.system}</td><td>${event.time}</td><td>${event.status}</td>`;
-                                tbody.appendChild(row);
+                systemIds.forEach(systemId => {
+                    const logRef = ref(db, 'logs/' + systemId);
+                    get(logRef).then(snap => {
+                        const logs = snap.val();
+                        if (logs) {
+                            Object.values(logs).forEach(log => {
+                                allEvents.push({
+                                    system: log.system || systems[systemId],
+                                    time: log.time || formatTimestamp(log.timestamp),
+                                    status: log.status,
+                                    timestamp: log.timestamp || Date.now()
+                                });
                             });
                         }
-                    }
+
+                        systemsProcessed++;
+
+                        if (systemsProcessed === systemIds.length) {
+                            // Sort by timestamp (newest first)
+                            allEvents.sort((a, b) => b.timestamp - a.timestamp);
+
+                            tbody.innerHTML = '';
+                            if (allEvents.length === 0) {
+                                const row = document.createElement('tr');
+                                row.innerHTML = `<td colspan="3" class="no-events">No events to display</td>`;
+                                tbody.appendChild(row);
+                            } else {
+                                allEvents.forEach(event => {
+                                    const row = document.createElement('tr');
+                                    // Add color coding based on status
+                                    let statusClass = '';
+                                    if (event.status === 'System_Fail' || event.status === 'OFF/TRIP') {
+                                        statusClass = 'class="off"';
+                                    } else {
+                                        statusClass = 'class="on"';
+                                    }
+                                    
+                                    row.innerHTML = `<td>${event.system}</td><td>${event.time}</td><td ${statusClass}>${event.status}</td>`;
+                                    tbody.appendChild(row);
+                                });
+                            }
+                            resolve(allEvents);
+                        }
+                    }).catch(error => {
+                        console.error('Error loading events for', systemId, error);
+                        systemsProcessed++;
+                        if (systemsProcessed === systemIds.length) {
+                            reject(error);
+                        }
+                    });
                 });
             });
         }
@@ -779,6 +879,7 @@
             document.getElementById('logout-btn').addEventListener('click', logout);
             document.getElementById('events-btn').addEventListener('click', openEventsTab);
             document.getElementById('close-events-btn').addEventListener('click', closeEventsTab);
+            document.getElementById('update-events-btn').addEventListener('click', updateEvents);
             
             updateNotificationStatus();
         });
