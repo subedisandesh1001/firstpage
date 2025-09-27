@@ -176,18 +176,6 @@
             background: #1a4a7a;
         }
         
-        .notification-toggle {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: 10px;
-        }
-        
-        .toggle-label {
-            margin-left: 8px;
-            font-size: 0.9rem;
-        }
-        
         /* Events Tab */
         #events-tab {
             display: none;
@@ -279,35 +267,6 @@
             background: #666;
             cursor: not-allowed;
         }
-        
-        /* Notification styles */
-        .notification-permission {
-            background: #0f3460;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-            text-align: center;
-            display: none;
-        }
-        
-        .notification-permission button {
-            background: #e94560;
-            margin-left: 10px;
-        }
-        
-        .notification-status {
-            margin-top: 10px;
-            font-size: 0.9rem;
-            color: #aaa;
-        }
-        
-        .status-online {
-            color: #4CAF50;
-        }
-        
-        .status-offline {
-            color: #e94560;
-        }
     </style>
 </head>
 <body>
@@ -318,13 +277,6 @@
             <p>Enter PIN (****)</p>
             <input type="password" id="pin-input" class="pin-input" maxlength="4" placeholder="Enter PIN">
             <button id="login-btn" class="login-btn">Login</button>
-            <div class="notification-permission" id="notification-permission-prompt">
-                <p>Enable browser notifications for status alerts?</p>
-                <button id="enable-notifications">Enable</button>
-            </div>
-            <div class="notification-status" id="notification-status">
-                Notifications: <span id="notification-status-text" class="status-offline">Disabled</span>
-            </div>
         </div>
     </div>
 
@@ -336,13 +288,6 @@
             <button id="refresh-btn">🔄 Refresh</button>
             <button id="logout-btn">🚪 Logout</button>
             <button id="events-btn">📜 Events</button>
-            <div class="notification-toggle">
-                <input type="checkbox" id="notification-toggle" checked>
-                <label for="notification-toggle" class="toggle-label">Enable Notifications</label>
-            </div>
-            <div class="notification-status">
-                Background Monitoring: <span id="background-status" class="status-online">Active</span>
-            </div>
         </div>
 
         <div class="dashboard">
@@ -440,8 +385,6 @@
         const systemIds = Object.keys(systems);
         const CORRECT_PIN = "1234";
         let isAuthenticated = false;
-        let notificationPermission = false;
-        let notificationsEnabled = true;
         let lastReferenceTime = null;
         let blinkInterval = null;
         const originalTitle = "NEA Substation";
@@ -469,120 +412,6 @@
             }
         }
 
-        // ================= BACKGROUND NOTIFICATION FUNCTIONS ===================
-        function showBrowserNotification(title, message, tag = '') {
-            if (!("Notification" in window) || !notificationsEnabled) return;
-            
-            if (Notification.permission === "granted") {
-                const notification = new Notification(title, {
-                    body: message,
-                    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iIzE2MjEzZSIvPgo8cGF0aCBkPSJNMzIgMTZDMzYuNDE4MyAxNiA0MCAxOS41ODE3IDQwIDI0VjM0QzQwIDM2LjIwMTUgNDEuMjQzOCAzOC4wNjA1IDQzLjE2MTQgMzguNzA0N3M0IDQyTDIwIDQyQzIwIDM4LjA2MDUgMjMuMjQzOCAzNi4yMDE1IDIzLjE2MTQgMzQuNzA0N0wyNCAzNFYyNEMyNCAxOS41ODE3IDI3LjU4MTcgMTYgMzIgMTZaIiBmaWxsPSIjZTk0NTYwIi8+CjxyZWN0IHg9IjI4IiB5PSI0NCIgd2lkdGg9IjgiIGhlaWdodD0iOCIgcng9IjQiIGZpbGw9IiNlOTQ1NjAiLz4KPC9zdmc+',
-                    tag: tag || 'nea-notification',
-                    requireInteraction: true,
-                    silent: false
-                });
-                
-                playNotificationSound();
-                
-                notification.onclick = function() {
-                    window.focus();
-                    this.close();
-                };
-                
-                setTimeout(() => {
-                    if (notification) notification.close();
-                }, 10000);
-            }
-        }
-
-        function playNotificationSound() {
-            try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-                oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.3);
-            } catch (e) {
-                console.log('Audio context not supported');
-            }
-        }
-
-        function updateNotificationStatus() {
-            const statusElement = document.getElementById('notification-status-text');
-            if (Notification.permission === "granted" && notificationsEnabled) {
-                statusElement.textContent = "Enabled";
-                statusElement.className = "status-online";
-            } else {
-                statusElement.textContent = "Disabled";
-                statusElement.className = "status-offline";
-            }
-        }
-
-        function requestNotificationPermission() {
-            if (!("Notification" in window)) return;
-            
-            if (Notification.permission === "default") {
-                document.getElementById('notification-permission-prompt').style.display = 'block';
-                updateNotificationStatus();
-            } else if (Notification.permission === "granted") {
-                notificationPermission = true;
-                document.getElementById('notification-toggle').checked = true;
-                updateNotificationStatus();
-            }
-        }
-
-        function enableNotifications() {
-            if (!("Notification" in window)) return;
-            
-            Notification.requestPermission().then(permission => {
-                if (permission === "granted") {
-                    notificationPermission = true;
-                    notificationsEnabled = true;
-                    document.getElementById('notification-permission-prompt').style.display = 'none';
-                    document.getElementById('notification-toggle').checked = true;
-                    updateNotificationStatus();
-                    showBrowserNotification("NEA Substation", "Background notifications enabled successfully!");
-                } else {
-                    notificationsEnabled = false;
-                    document.getElementById('notification-toggle').checked = false;
-                    updateNotificationStatus();
-                }
-            });
-        }
-
-        function toggleNotifications() {
-            notificationsEnabled = document.getElementById('notification-toggle').checked;
-            
-            if (notificationsEnabled && Notification.permission !== "granted") {
-                enableNotifications();
-            } else if (notificationsEnabled) {
-                showBrowserNotification("NEA Substation", "Background notifications enabled");
-                updateNotificationStatus();
-            } else {
-                updateNotificationStatus();
-            }
-        }
-
-        // ================= PAGE VISIBILITY API ===================
-        function handleVisibilityChange() {
-            if (document.hidden) {
-                document.getElementById('background-status').textContent = "Monitoring";
-            } else {
-                document.getElementById('background-status').textContent = "Active";
-                stopBlinkingTitle();
-            }
-        }
-
         // ================= HELPER FUNCTIONS ===================
         function formatTime(date) {
             return new Intl.DateTimeFormat('en-GB', {
@@ -594,22 +423,6 @@
                 second: '2-digit',
                 hour12: true
             }).format(date);
-        }
-
-        function formatTimestamp(timestamp) {
-            // Convert ESP8266 timestamp (milliseconds) to readable time
-            if (!timestamp) return '--:--';
-            
-            // If timestamp is in milliseconds (from ESP8266 millis())
-            if (timestamp > 1000000000000) {
-                // It's already a proper timestamp
-                return formatTime(new Date(timestamp));
-            } else {
-                // It's from ESP8266 millis() - convert to actual time
-                const currentTime = new Date();
-                const eventTime = new Date(currentTime - (Date.now() - timestamp));
-                return formatTime(eventTime);
-            }
         }
 
         function updateClock() {
@@ -655,12 +468,6 @@
                 box.className = "status-box off blink-red";
                 
                 if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
-                    showBrowserNotification(
-                        "⚠️ CRITICAL ALERT - NEA Substation", 
-                        `${systemName} status changed to: ${status}`,
-                        `critical-${systemId}-${Date.now()}`
-                    );
-                    
                     if (!document.hidden) {
                         startBlinkingTitle(`⚠️ ${systemName} ${status}`);
                     }
@@ -668,47 +475,15 @@
             } else {
                 box.className = "status-box on";
                 
-                if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
-                    showBrowserNotification(
-                        "✅ System Update - NEA Substation", 
-                        `${systemName} status changed to: ${status}`,
-                        `update-${systemId}-${Date.now()}`
-                    );
-                }
-                
                 if (!document.hidden) {
                     stopBlinkingTitle();
                 }
             }
 
-            // Save event log with proper system name
+            // Only update status display, no event logging to Firebase
             if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
                 console.log(`Status change detected for ${systemName}: ${lastStatus[systemId]} -> ${status}`);
                 lastStatus[systemId] = status;
-                
-                const logRef = ref(db, 'logs/' + systemId);
-                const nowFormatted = formatTime(new Date());
-                
-                // Save with display name instead of technical ID
-                await push(logRef, { 
-                    system: systemName,
-                    time: nowFormatted, 
-                    status: status, 
-                    timestamp: Date.now(),
-                    systemId: systemId
-                });
-
-                // Keep max 10 events per system
-                get(logRef).then(snapshot => {
-                    const logs = snapshot.val();
-                    if (logs) {
-                        const keys = Object.keys(logs);
-                        if (keys.length > 10) {
-                            const keysToRemove = keys.slice(0, keys.length - 10);
-                            keysToRemove.forEach(k => remove(ref(db, `logs/${systemId}/${k}`)));
-                        }
-                    }
-                });
             } else {
                 if (!lastStatus.hasOwnProperty(systemId)) {
                     console.log(`Initial status for ${systemName}: ${status}`);
@@ -723,7 +498,6 @@
             updateClock();
             
             updateVisitorCounter();
-            document.addEventListener('visibilitychange', handleVisibilityChange);
             
             let systemsInitialized = 0;
 
@@ -749,7 +523,6 @@
                 isAuthenticated = true;
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
-                requestNotificationPermission();
                 initDashboard();
             } else {
                 alert("Invalid PIN");
@@ -794,7 +567,6 @@
             try {
                 await loadAllEvents();
                 updateEventsLastUpdate();
-                showBrowserNotification("NEA Substation", "Events updated successfully!");
             } catch (error) {
                 console.error('Error updating events:', error);
             } finally {
@@ -820,7 +592,7 @@
                             Object.values(logs).forEach(log => {
                                 allEvents.push({
                                     system: log.system || systems[systemId],
-                                    time: log.time || formatTimestamp(log.timestamp),
+                                    time: log.time || '--:--',
                                     status: log.status,
                                     timestamp: log.timestamp || Date.now()
                                 });
@@ -873,15 +645,11 @@
                 if (e.key === "Enter") authenticate();
             });
             
-            document.getElementById('enable-notifications').addEventListener('click', enableNotifications);
-            document.getElementById('notification-toggle').addEventListener('change', toggleNotifications);
             document.getElementById('refresh-btn').addEventListener('click', refreshPage);
             document.getElementById('logout-btn').addEventListener('click', logout);
             document.getElementById('events-btn').addEventListener('click', openEventsTab);
             document.getElementById('close-events-btn').addEventListener('click', closeEventsTab);
             document.getElementById('update-events-btn').addEventListener('click', updateEvents);
-            
-            updateNotificationStatus();
         });
 
         window.openEventsTab = openEventsTab;
