@@ -32,8 +32,8 @@
             min-height: 100vh;
         }
         
-        /* Abstract Technology Background */
-        .tech-background {
+        /* Electronic Circuits Background */
+        .circuit-background {
             position: fixed;
             top: 0;
             left: 0;
@@ -45,10 +45,11 @@
                 radial-gradient(circle at 80% 20%, rgba(79, 172, 254, 0.15) 0%, transparent 50%),
                 radial-gradient(circle at 40% 40%, rgba(15, 52, 96, 0.25) 0%, transparent 50%);
             background-color: var(--primary);
+            overflow: hidden;
         }
         
-        .tech-background::before {
-            content: '';
+        /* Circuit Board Base */
+        .circuit-board {
             position: absolute;
             top: 0;
             left: 0;
@@ -60,21 +61,79 @@
             background-size: 100px 100px, 100px 100px;
             background-position: -1px -1px, -1px -1px;
             animation: gridMove 120s linear infinite;
+            opacity: 0.6;
         }
         
-        .tech-background::after {
-            content: '';
+        /* Circuit Paths */
+        .circuit-path {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(circle at 50% 50%, rgba(79, 172, 254, 0.1) 0%, transparent 70%),
-                radial-gradient(circle at 10% 90%, rgba(233, 69, 96, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 90% 10%, rgba(15, 52, 96, 0.2) 0%, transparent 50%);
-            animation: pulse 20s ease-in-out infinite;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #4fdcfe, transparent);
+            border-radius: 1px;
+            filter: blur(0.5px);
+            opacity: 0.7;
         }
+        
+        .path-1 { top: 20%; left: 0; width: 100%; }
+        .path-2 { top: 40%; left: 0; width: 100%; }
+        .path-3 { top: 60%; left: 0; width: 100%; }
+        .path-4 { top: 80%; left: 0; width: 100%; }
+        
+        /* Circuit Nodes */
+        .circuit-node {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #4fdcfe;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #4fdcfe;
+            animation: nodePulse 3s ease-in-out infinite;
+        }
+        
+        .node-1 { top: 20%; left: 10%; animation-delay: 0s; }
+        .node-2 { top: 20%; left: 30%; animation-delay: 0.5s; }
+        .node-3 { top: 20%; left: 50%; animation-delay: 1s; }
+        .node-4 { top: 20%; left: 70%; animation-delay: 1.5s; }
+        .node-5 { top: 20%; left: 90%; animation-delay: 2s; }
+        
+        .node-6 { top: 40%; left: 15%; animation-delay: 0.2s; }
+        .node-7 { top: 40%; left: 35%; animation-delay: 0.7s; }
+        .node-8 { top: 40%; left: 55%; animation-delay: 1.2s; }
+        .node-9 { top: 40%; left: 75%; animation-delay: 1.7s; }
+        .node-10 { top: 40%; left: 95%; animation-delay: 2.2s; }
+        
+        .node-11 { top: 60%; left: 5%; animation-delay: 0.4s; }
+        .node-12 { top: 60%; left: 25%; animation-delay: 0.9s; }
+        .node-13 { top: 60%; left: 45%; animation-delay: 1.4s; }
+        .node-14 { top: 60%; left: 65%; animation-delay: 1.9s; }
+        .node-15 { top: 60%; left: 85%; animation-delay: 2.4s; }
+        
+        .node-16 { top: 80%; left: 20%; animation-delay: 0.1s; }
+        .node-17 { top: 80%; left: 40%; animation-delay: 0.6s; }
+        .node-18 { top: 80%; left: 60%; animation-delay: 1.1s; }
+        .node-19 { top: 80%; left: 80%; animation-delay: 1.6s; }
+        
+        /* Data Flow Animation */
+        .data-flow {
+            position: absolute;
+            width: 12px;
+            height: 4px;
+            background: radial-gradient(circle, #e94560, #ff6b6b, transparent);
+            border-radius: 2px;
+            filter: blur(1px);
+            opacity: 0.8;
+            z-index: 1;
+            animation: dataFlow 8s linear infinite;
+        }
+        
+        .flow-1 { top: 20%; animation-delay: 0s; }
+        .flow-2 { top: 40%; animation-delay: 1s; }
+        .flow-3 { top: 60%; animation-delay: 2s; }
+        .flow-4 { top: 80%; animation-delay: 3s; }
+        .flow-5 { top: 20%; animation-delay: 4s; }
+        .flow-6 { top: 40%; animation-delay: 5s; }
+        .flow-7 { top: 60%; animation-delay: 6s; }
+        .flow-8 { top: 80%; animation-delay: 7s; }
         
         @keyframes gridMove {
             0% {
@@ -85,12 +144,33 @@
             }
         }
         
-        @keyframes pulse {
+        @keyframes nodePulse {
             0%, 100% {
-                opacity: 0.5;
+                transform: scale(1);
+                opacity: 0.7;
+                box-shadow: 0 0 10px #4fdcfe;
+            }
+            50% {
+                transform: scale(1.3);
+                opacity: 1;
+                box-shadow: 0 0 20px #4fdcfe, 0 0 30px #4fdcfe;
+            }
+        }
+        
+        @keyframes dataFlow {
+            0% {
+                left: 0%;
+                opacity: 0.8;
+                transform: scale(1);
             }
             50% {
                 opacity: 1;
+                transform: scale(1.2);
+            }
+            100% {
+                left: 100%;
+                opacity: 0;
+                transform: scale(0.8);
             }
         }
         
@@ -118,7 +198,7 @@
         
         .login-logo {
             height: 70px;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             filter: drop-shadow(0 0 10px rgba(79, 172, 254, 0.5));
         }
         
@@ -139,7 +219,7 @@
         .pin-input {
             padding: 12px 15px;
             width: 100%;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             border: none;
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.1);
@@ -173,12 +253,37 @@
             border-radius: 8px;
             transition: all 0.3s;
             font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
         }
         
         .login-btn:hover {
             background: linear-gradient(135deg, #d1344e, #e94560);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(233, 69, 96, 0.4);
+        }
+        
+        .login-btn:active {
+            transform: translateY(0);
+        }
+        
+        .login-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .login-btn:hover::before {
+            left: 100%;
         }
         
         /* Dashboard */
@@ -549,17 +654,58 @@
     </style>
 </head>
 <body>
-    <!-- Abstract Technology Background -->
-    <div class="tech-background"></div>
+    <!-- Electronic Circuits Background -->
+    <div class="circuit-background">
+        <div class="circuit-board"></div>
+        
+        <!-- Circuit Paths -->
+        <div class="circuit-path path-1"></div>
+        <div class="circuit-path path-2"></div>
+        <div class="circuit-path path-3"></div>
+        <div class="circuit-path path-4"></div>
+        
+        <!-- Circuit Nodes -->
+        <div class="circuit-node node-1"></div>
+        <div class="circuit-node node-2"></div>
+        <div class="circuit-node node-3"></div>
+        <div class="circuit-node node-4"></div>
+        <div class="circuit-node node-5"></div>
+        <div class="circuit-node node-6"></div>
+        <div class="circuit-node node-7"></div>
+        <div class="circuit-node node-8"></div>
+        <div class="circuit-node node-9"></div>
+        <div class="circuit-node node-10"></div>
+        <div class="circuit-node node-11"></div>
+        <div class="circuit-node node-12"></div>
+        <div class="circuit-node node-13"></div>
+        <div class="circuit-node node-14"></div>
+        <div class="circuit-node node-15"></div>
+        <div class="circuit-node node-16"></div>
+        <div class="circuit-node node-17"></div>
+        <div class="circuit-node node-18"></div>
+        <div class="circuit-node node-19"></div>
+        
+        <!-- Data Flow Animation -->
+        <div class="data-flow flow-1"></div>
+        <div class="data-flow flow-2"></div>
+        <div class="data-flow flow-3"></div>
+        <div class="data-flow flow-4"></div>
+        <div class="data-flow flow-5"></div>
+        <div class="data-flow flow-6"></div>
+        <div class="data-flow flow-7"></div>
+        <div class="data-flow flow-8"></div>
+    </div>
 
     <!-- LOGIN -->
     <div id="login-screen">
         <div class="login-container">
-        
             <h1 class="login-title">NEA Sunwal S/S</h1>
             <p class="login-subtitle">Enter PIN to access dashboard</p>
             <input type="password" id="pin-input" class="pin-input" maxlength="4" placeholder="Enter PIN">
-            <button id="login-btn" class="login-btn">Login</button>
+            <button id="login-btn" class="login-btn">
+                <span>🔐</span>
+                <span>Login</span>
+            </button>
         </div>
     </div>
 
@@ -567,7 +713,7 @@
     <div id="dashboard">
         <div class="header">
             <div class="header-left">
-            <img src="logo.png" alt="logo" class="logo-main">
+                <img src="logo.png" alt="logo" class="logo-main">
             </div>
             <div class="header-center">
                 <div class="title-container">
