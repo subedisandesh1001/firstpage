@@ -445,188 +445,6 @@
             animation: blink-red-animation 1s infinite;
         }
         
-        /* Outage Tab Styles */
-        #outage-tab {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.95);
-            overflow: auto;
-            color: white;
-            z-index: 1000;
-            padding: 20px;
-        }
-        
-        .outage-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 25px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .outage-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        
-        .outage-title {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 1.8rem;
-            background: linear-gradient(90deg, #e94560, #4fdcfe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        .outage-controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        
-        .period-select {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        
-        .period-select option {
-            background: var(--secondary);
-            color: white;
-        }
-        
-        .outage-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .outage-stat-card {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 10px;
-            border-left: 4px solid #e94560;
-        }
-        
-        .stat-card-header {
-            display: flex;
-            justify-content: between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .system-name {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #4fdcfe;
-        }
-        
-        .outage-duration {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #e94560;
-            margin: 10px 0;
-        }
-        
-        .outage-count {
-            color: #aaa;
-            font-size: 0.9rem;
-        }
-        
-        .outage-events {
-            margin-top: 25px;
-        }
-        
-        .events-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        .events-table th, .events-table td {
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 12px;
-            text-align: left;
-        }
-        
-        .events-table th {
-            background: rgba(15, 52, 96, 0.7);
-            font-weight: 600;
-        }
-        
-        .events-table tr:nth-child(even) {
-            background: rgba(255, 255, 255, 0.02);
-        }
-        
-        .outage-badge {
-            background: #e94560;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
-
-        .ongoing-badge {
-            background: #ff9800;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
-        
-        .no-outage-data {
-            text-align: center;
-            padding: 40px;
-            color: #aaa;
-            font-size: 1.1rem;
-        }
-
-        /* Outage View Tabs */
-        .outage-view-tabs {
-            display: flex;
-            margin-bottom: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .outage-view-tab {
-            padding: 10px 20px;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
-        }
-        
-        .outage-view-tab.active {
-            border-bottom-color: #e94560;
-            color: #e94560;
-        }
-        
-        .outage-view-content {
-            display: none;
-        }
-        
-        .outage-view-content.active {
-            display: block;
-        }
-        
         footer {
             text-align: center;
             margin-top: 20px;
@@ -727,7 +545,7 @@
             font-weight: 600;
         }
         
-        #close-events-btn, #close-outage-btn {
+        #close-events-btn {
             background: var(--accent);
             color: white;
             padding: 10px 15px;
@@ -741,7 +559,7 @@
             gap: 5px;
         }
         
-        #close-events-btn:hover, #close-outage-btn:hover {
+        #close-events-btn:hover {
             background: #d1344e;
         }
         
@@ -822,10 +640,6 @@
             .card {
                 width: 100%;
                 max-width: 350px;
-            }
-            
-            .outage-stats-grid {
-                grid-template-columns: 1fr;
             }
             
             footer {
@@ -912,7 +726,6 @@
                 <button id="refresh-btn">🔄 Refresh</button>
                 <button id="logout-btn">🚪 Logout</button>
                 <button id="events-btn">📜 Events</button>
-                <button id="outage-btn">⚡ Outage</button>
             </div>
         </div>
 
@@ -922,7 +735,7 @@
                 <div id="33kv-system" class="status-box">--</div>
             </div>
             <div class="card">
-                <h2>11 kV INCOMER CB</h2>
+                <h2>11 kV INCOMER CB </h2>
                 <div id="Feeder-1" class="status-box">--</div>
             </div>
             <div class="card">
@@ -986,67 +799,6 @@
         </div>
     </div>
 
-    <!-- OUTAGE TAB -->
-    <div id="outage-tab">
-        <div class="outage-container">
-            <button id="close-outage-btn">✖ Close Outage</button>
-            <div class="outage-header">
-                <div class="outage-title">
-                    <h2>⚡ Outage Analysis</h2>
-                </div>
-                <div class="outage-controls">
-                    <select id="period-select" class="period-select">
-                        <option value="24h">Last 24 Hours</option>
-                        <option value="7d">Last 7 Days</option>
-                        <option value="30d" selected>Last 30 Days</option>
-                        <option value="90d">Last 90 Days</option>
-                    </select>
-                    <button id="refresh-outage-btn" class="update-events-btn">🔄 Refresh</button>
-                </div>
-            </div>
-
-            <!-- Outage View Tabs -->
-            <div class="outage-view-tabs">
-                <div class="outage-view-tab active" data-view="132kv">132 kV System</div>
-                <div class="outage-view-tab" data-view="11kv">11 kV Feeders</div>
-            </div>
-
-            <!-- 132 kV System View -->
-            <div class="outage-view-content active" id="outage-view-132kv">
-                <div class="outage-stats-grid" id="outage-stats-132kv">
-                    <div class="no-outage-data">Loading 132 kV outage data...</div>
-                </div>
-            </div>
-
-            <!-- 11 kV Feeders View -->
-            <div class="outage-view-content" id="outage-view-11kv">
-                <div class="outage-stats-grid" id="outage-stats-11kv">
-                    <div class="no-outage-data">Loading 11 kV feeders outage data...</div>
-                </div>
-            </div>
-
-            <div class="outage-events">
-                <h3 style="margin-bottom: 15px; color: #4fdcfe;">Outage Events</h3>
-                <table class="events-table" id="outage-events-table">
-                    <thead>
-                        <tr>
-                            <th>System</th>
-                            <th>Start Time</th>
-                            <th>End Time</th>
-                            <th>Duration</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="outage-events-body">
-                        <tr>
-                            <td colspan="5" class="no-events">No outage events found</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, onValue, push, remove, get, set, increment } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
@@ -1068,14 +820,14 @@
         // ================= GLOBAL VARIABLES ===================
         const systems = {
             "33kv-system": "132 kV System",
-            "Feeder-1": "11 kV INCOMER CB", 
-            "Feeder-2": "11 kV ASHNIYA CB",
-            "Feeder-3": "11 kV RAMAWAPUR CB",
+            "Feeder-1": "11 kV INCOMER", 
+            "Feeder-2": "11 kV ASHNIYA-1",
+            "Feeder-3": "11 kV RAMAWAPUR-2",
             "Feeder-4": "SPARE FEEDER-3"
         };
         
         const systemIds = Object.keys(systems);
-        const CORRECT_PIN = "0000";
+        const CORRECT_PIN = "1234";
         let isAuthenticated = false;
         let lastReferenceTime = null;
         let blinkInterval = null;
@@ -1084,390 +836,6 @@
         let initialLoadComplete = false;
         let lastEventsUpdate = null;
         let isUpdatingEvents = false;
-
-        // ================= ENHANCED OUTAGE ANALYSIS FUNCTIONS ===================
-        function calculateOutagePeriods(events) {
-            const outagePeriods = {};
-            
-            systemIds.forEach(systemId => {
-                outagePeriods[systemId] = [];
-                const systemEvents = events
-                    .filter(event => event.system === systems[systemId] || event.system === systemId)
-                    .sort((a, b) => a.timestamp - b.timestamp);
-                
-                let currentOutage = null;
-                
-                for (let i = 0; i < systemEvents.length; i++) {
-                    const event = systemEvents[i];
-                    
-                    if ((event.status === 'System_Fail' || event.status === 'OFF/TRIP') && !currentOutage) {
-                        // Start of new outage
-                        currentOutage = {
-                            system: systems[systemId],
-                            startTime: event.time,
-                            startTimestamp: event.timestamp,
-                            startEvent: event
-                        };
-                    } 
-                    else if ((event.status === 'LIVE' || event.status === 'ON') && currentOutage) {
-                        // End of current outage
-                        currentOutage.endTime = event.time;
-                        currentOutage.endTimestamp = event.timestamp;
-                        currentOutage.endEvent = event;
-                        currentOutage.duration = currentOutage.endTimestamp - currentOutage.startTimestamp;
-                        currentOutage.status = 'RESOLVED';
-                        
-                        outagePeriods[systemId].push(currentOutage);
-                        currentOutage = null;
-                    }
-                }
-                
-                // Handle ongoing outage (no end event yet)
-                if (currentOutage) {
-                    const now = Date.now();
-                    currentOutage.endTime = 'Ongoing';
-                    currentOutage.endTimestamp = now;
-                    currentOutage.duration = now - currentOutage.startTimestamp;
-                    currentOutage.status = 'ONGOING';
-                    outagePeriods[systemId].push(currentOutage);
-                }
-            });
-            
-            return outagePeriods;
-        }
-
-        function calculateOutageStats(outagePeriods) {
-            const outageStats = {};
-            
-            systemIds.forEach(systemId => {
-                const periods = outagePeriods[systemId];
-                outageStats[systemId] = {
-                    totalDuration: 0,
-                    outageCount: periods.length,
-                    ongoingCount: periods.filter(p => p.status === 'ONGOING').length,
-                    resolvedCount: periods.filter(p => p.status === 'RESOLVED').length,
-                    events: periods
-                };
-                
-                // Calculate total duration in minutes
-                outageStats[systemId].totalDuration = periods.reduce((total, period) => {
-                    return total + Math.round(period.duration / (1000 * 60));
-                }, 0);
-            });
-            
-            return outageStats;
-        }
-
-        function formatDuration(minutes) {
-            if (minutes < 60) {
-                return `${minutes}m`;
-            } else {
-                const hours = Math.floor(minutes / 60);
-                const mins = minutes % 60;
-                return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-            }
-        }
-
-        function formatDurationFromMs(ms) {
-            const minutes = Math.round(ms / (1000 * 60));
-            return formatDuration(minutes);
-        }
-
-        function displayOutageStats(outageStats, containerId, filterType) {
-            const statsContainer = document.getElementById(containerId);
-            statsContainer.innerHTML = '';
-
-            let hasOutageData = false;
-            let filteredSystems = [];
-
-            // Filter systems based on view type
-            if (filterType === '132kv') {
-                filteredSystems = ['33kv-system'];
-            } else if (filterType === '11kv') {
-                filteredSystems = systemIds.filter(id => id !== '33kv-system');
-            }
-
-            filteredSystems.forEach(systemId => {
-                const stats = outageStats[systemId];
-                if (stats.outageCount > 0) {
-                    hasOutageData = true;
-                    
-                    const statCard = document.createElement('div');
-                    statCard.className = 'outage-stat-card';
-                    statCard.innerHTML = `
-                        <div class="stat-card-header">
-                            <div class="system-name">${systems[systemId]}</div>
-                            <div>
-                                ${stats.ongoingCount > 0 ? `<span class="ongoing-badge">${stats.ongoingCount} ongoing</span>` : ''}
-                                <span class="outage-badge">${stats.outageCount} outages</span>
-                            </div>
-                        </div>
-                        <div class="outage-duration">${formatDuration(stats.totalDuration)}</div>
-                        <div class="outage-count">Total outage time</div>
-                        <div style="margin-top: 10px; font-size: 0.8rem; color: #aaa;">
-                            ${stats.resolvedCount} resolved • ${stats.ongoingCount} ongoing
-                        </div>
-                    `;
-                    statsContainer.appendChild(statCard);
-                }
-            });
-
-            if (!hasOutageData) {
-                statsContainer.innerHTML = '<div class="no-outage-data">No outage events found in the selected period</div>';
-            }
-        }
-
-        function displayOutageEvents(outagePeriods, filterType) {
-            const eventsBody = document.getElementById('outage-events-body');
-            eventsBody.innerHTML = '';
-
-            let allOutageEvents = [];
-            let filteredSystems = [];
-
-            // Filter systems based on view type
-            if (filterType === '132kv') {
-                filteredSystems = ['33kv-system'];
-            } else if (filterType === '11kv') {
-                filteredSystems = systemIds.filter(id => id !== '33kv-system');
-            }
-
-            // Collect outage events from filtered systems
-            filteredSystems.forEach(systemId => {
-                outagePeriods[systemId].forEach(outage => {
-                    allOutageEvents.push({
-                        system: outage.system,
-                        startTime: outage.startTime,
-                        endTime: outage.endTime,
-                        duration: formatDurationFromMs(outage.duration),
-                        status: outage.status,
-                        timestamp: outage.startTimestamp
-                    });
-                });
-            });
-
-            if (allOutageEvents.length === 0) {
-                eventsBody.innerHTML = '<tr><td colspan="5" class="no-events">No outage events found</td></tr>';
-                return;
-            }
-
-            // Sort by start time (newest first)
-            allOutageEvents.sort((a, b) => b.timestamp - a.timestamp);
-            
-            // Display events
-            allOutageEvents.forEach(event => {
-                const row = document.createElement('tr');
-                const statusBadge = event.status === 'ONGOING' ? 
-                    `<span class="ongoing-badge">${event.status}</span>` : 
-                    `<span class="outage-badge">${event.status}</span>`;
-                
-                row.innerHTML = `
-                    <td>${event.system}</td>
-                    <td>${event.startTime}</td>
-                    <td>${event.endTime}</td>
-                    <td>${event.duration}</td>
-                    <td>${statusBadge}</td>
-                `;
-                eventsBody.appendChild(row);
-            });
-        }
-
-        function filterEventsByPeriod(events, period) {
-            const now = new Date();
-            let cutoffTime;
-            
-            switch(period) {
-                case '24h':
-                    cutoffTime = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-                    break;
-                case '7d':
-                    cutoffTime = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-                    break;
-                case '30d':
-                    cutoffTime = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-                    break;
-                case '90d':
-                    cutoffTime = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000));
-                    break;
-                default:
-                    cutoffTime = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-            }
-            
-            return events.filter(event => {
-                const eventTime = new Date(event.timestamp);
-                return eventTime >= cutoffTime;
-            });
-        }
-
-        async function loadOutageData() {
-            try {
-                const period = document.getElementById('period-select').value;
-                const currentView = document.querySelector('.outage-view-tab.active').getAttribute('data-view');
-                let allEvents = [];
-                let systemsProcessed = 0;
-
-                // Clear previous data
-                document.getElementById('outage-stats-132kv').innerHTML = '<div class="no-outage-data">Loading 132 kV outage data...</div>';
-                document.getElementById('outage-stats-11kv').innerHTML = '<div class="no-outage-data">Loading 11 kV feeders outage data...</div>';
-                document.getElementById('outage-events-body').innerHTML = '<tr><td colspan="5" class="no-events">Loading events...</td></tr>';
-
-                systemIds.forEach(systemId => {
-                    const logRef = ref(db, 'logs/' + systemId);
-                    get(logRef).then(snap => {
-                        const logs = snap.val();
-                        if (logs) {
-                            Object.entries(logs).forEach(([key, log]) => {
-                                // Ensure we have proper timestamp
-                                let timestamp;
-                                if (log.timestamp) {
-                                    timestamp = typeof log.timestamp === 'number' ? log.timestamp : new Date(log.timestamp).getTime();
-                                } else if (log.time) {
-                                    timestamp = new Date(log.time).getTime();
-                                } else {
-                                    timestamp = Date.now();
-                                }
-
-                                allEvents.push({
-                                    system: log.system || systems[systemId],
-                                    time: log.time || new Date(timestamp).toLocaleString(),
-                                    status: log.status,
-                                    timestamp: timestamp,
-                                    systemId: systemId
-                                });
-                            });
-                        }
-
-                        systemsProcessed++;
-
-                        if (systemsProcessed === systemIds.length) {
-                            // Filter events by period
-                            const filteredEvents = filterEventsByPeriod(allEvents, period);
-                            
-                            // Calculate outage periods
-                            const outagePeriods = calculateOutagePeriods(filteredEvents);
-                            
-                            // Calculate statistics
-                            const outageStats = calculateOutageStats(outagePeriods);
-                            
-                            // Display statistics for different views
-                            displayOutageStats(outageStats, 'outage-stats-132kv', '132kv');
-                            displayOutageStats(outageStats, 'outage-stats-11kv', '11kv');
-                            
-                            // Display outage events table for current view
-                            displayOutageEvents(outagePeriods, currentView);
-                        }
-                    }).catch(error => {
-                        console.error('Error loading outage data for', systemId, error);
-                        systemsProcessed++;
-                    });
-                });
-            } catch (error) {
-                console.error('Error loading outage data:', error);
-                document.getElementById('outage-stats-132kv').innerHTML = 
-                    '<div class="no-outage-data">Error loading outage data</div>';
-                document.getElementById('outage-stats-11kv').innerHTML = 
-                    '<div class="no-outage-data">Error loading outage data</div>';
-            }
-        }
-
-        // ================= OUTAGE VIEW TABS ===================
-        function initOutageViewTabs() {
-            const tabs = document.querySelectorAll('.outage-view-tab');
-            const contents = document.querySelectorAll('.outage-view-content');
-            
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    // Remove active class from all tabs and contents
-                    tabs.forEach(t => t.classList.remove('active'));
-                    contents.forEach(c => c.classList.remove('active'));
-                    
-                    // Add active class to clicked tab
-                    tab.classList.add('active');
-                    
-                    // Show corresponding content
-                    const viewId = tab.getAttribute('data-view');
-                    document.getElementById(`outage-view-${viewId}`).classList.add('active');
-                    
-                    // Reload data for the selected view
-                    loadOutageData();
-                });
-            });
-        }
-
-        function openOutageTab() {
-            const tab = document.getElementById('outage-tab');
-            tab.style.display = 'block';
-            loadOutageData();
-        }
-
-        function closeOutageTab() {
-            const tab = document.getElementById('outage-tab');
-            tab.style.display = 'none';
-        }
-
-        // ================= ENHANCED EVENT LOGGING ===================
-        async function logEvent(systemId, status) {
-            try {
-                const eventData = {
-                    system: systems[systemId],
-                    time: new Date().toLocaleString(),
-                    status: status,
-                    timestamp: Date.now()
-                };
-                
-                const logRef = ref(db, 'logs/' + systemId);
-                await push(logRef, eventData);
-                console.log(`Event logged: ${systems[systemId]} - ${status}`);
-            } catch (error) {
-                console.error('Error logging event:', error);
-            }
-        }
-
-        // ================= ENHANCED STATUS UPDATE ===================
-        async function updateStatus(systemId, value, isInitialLoad = false) {
-            const box = document.getElementById(systemId);
-            if (!box) return;
-
-            const systemName = systems[systemId];
-            let status = value === 1 ? (systemId === "33kv-system" ? "LIVE" : "ON") : (systemId === "33kv-system" ? "System_Fail" : "OFF/TRIP");
-            box.innerText = status;
-            lastReferenceTime = new Date();
-            updateClock();
-
-            if (status === "System_Fail" || status === "OFF/TRIP") {
-                box.className = "status-box off blink-red";
-                
-                if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
-                    if (!document.hidden) {
-                        startBlinkingTitle(`⚠️ ${systemName} ${status}`);
-                    }
-                    // Log outage event
-                    await logEvent(systemId, status);
-                }
-            } else {
-                box.className = "status-box on";
-                
-                if (!document.hidden) {
-                    stopBlinkingTitle();
-                }
-                
-                // Log restoration event when system comes back online
-                if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && 
-                    (lastStatus[systemId] === "System_Fail" || lastStatus[systemId] === "OFF/TRIP")) {
-                    await logEvent(systemId, status);
-                }
-            }
-
-            // Update last status
-            if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
-                console.log(`Status change detected for ${systemName}: ${lastStatus[systemId]} -> ${status}`);
-                lastStatus[systemId] = status;
-            } else {
-                if (!lastStatus.hasOwnProperty(systemId)) {
-                    console.log(`Initial status for ${systemName}: ${status}`);
-                    lastStatus[systemId] = status;
-                }
-            }
-        }
 
         // ================= VISITOR COUNTER ===================
         async function updateVisitorCounter() {
@@ -1529,6 +897,45 @@
             document.getElementById('events-last-update').textContent = formatTime(lastEventsUpdate);
         }
 
+        // ================= STATUS & EVENT LOG ===================
+        async function updateStatus(systemId, value, isInitialLoad = false) {
+            const box = document.getElementById(systemId);
+            if (!box) return;
+
+            const systemName = systems[systemId];
+            let status = value === 1 ? (systemId === "33kv-system" ? "LIVE" : "ON") : (systemId === "33kv-system" ? "System_Fail" : "OFF/TRIP");
+            box.innerText = status;
+            lastReferenceTime = new Date();
+            updateClock();
+
+            if (status === "System_Fail" || status === "OFF/TRIP") {
+                box.className = "status-box off blink-red";
+                
+                if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
+                    if (!document.hidden) {
+                        startBlinkingTitle(`⚠️ ${systemName} ${status}`);
+                    }
+                }
+            } else {
+                box.className = "status-box on";
+                
+                if (!document.hidden) {
+                    stopBlinkingTitle();
+                }
+            }
+
+            // Only update status display, no event logging to Firebase
+            if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
+                console.log(`Status change detected for ${systemName}: ${lastStatus[systemId]} -> ${status}`);
+                lastStatus[systemId] = status;
+            } else {
+                if (!lastStatus.hasOwnProperty(systemId)) {
+                    console.log(`Initial status for ${systemName}: ${status}`);
+                    lastStatus[systemId] = status;
+                }
+            }
+        }
+
         // ================= DASHBOARD INIT ===================
         function initDashboard() {
             setInterval(updateClock, 1000);
@@ -1540,9 +947,9 @@
 
             systemIds.forEach(systemId => {
                 const sysRef = ref(db, systemId);
-                onValue(sysRef, async (snap) => {
+                onValue(sysRef, snap => {
                     const isInitial = !initialLoadComplete || !lastStatus.hasOwnProperty(systemId);
-                    await updateStatus(systemId, snap.val(), isInitial);
+                    updateStatus(systemId, snap.val(), isInitial);
 
                     systemsInitialized++;
                     if (systemsInitialized >= systemIds.length && !initialLoadComplete) {
@@ -1675,7 +1082,7 @@
             });
         }
 
-        // ================= DOM EVENT LISTENERS ===================
+        // DOM Events
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('login-btn').addEventListener('click', authenticate);
             document.getElementById('pin-input').addEventListener('keypress', e => {
@@ -1685,21 +1092,12 @@
             document.getElementById('refresh-btn').addEventListener('click', refreshPage);
             document.getElementById('logout-btn').addEventListener('click', logout);
             document.getElementById('events-btn').addEventListener('click', openEventsTab);
-            document.getElementById('outage-btn').addEventListener('click', openOutageTab);
             document.getElementById('close-events-btn').addEventListener('click', closeEventsTab);
-            document.getElementById('close-outage-btn').addEventListener('click', closeOutageTab);
             document.getElementById('update-events-btn').addEventListener('click', updateEvents);
-            document.getElementById('refresh-outage-btn').addEventListener('click', loadOutageData);
-            document.getElementById('period-select').addEventListener('change', loadOutageData);
-            
-            // Initialize outage view tabs
-            initOutageViewTabs();
         });
 
         window.openEventsTab = openEventsTab;
         window.closeEventsTab = closeEventsTab;
-        window.openOutageTab = openOutageTab;
-        window.closeOutageTab = closeOutageTab;
         window.refreshPage = refreshPage;
         window.logout = logout;
     </script>
