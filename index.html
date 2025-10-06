@@ -564,7 +564,7 @@
         }
         
         .events-container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.05);
             padding: 25px;
@@ -613,6 +613,11 @@
             cursor: not-allowed;
         }
         
+        .duration-cell {
+            font-weight: bold;
+            color: #4fdcfe;
+        }
+        
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -649,6 +654,14 @@
             
             .footer-info, .visitor-counter {
                 align-items: center;
+            }
+            
+            #events-tab table {
+                font-size: 0.8rem;
+            }
+            
+            #events-tab th, #events-tab td {
+                padding: 8px 4px;
             }
         }
     </style>
@@ -786,13 +799,15 @@
                 <thead>
                     <tr>
                         <th>System</th>
-                        <th>Time</th>
+                        <th>Start Time</th>
+                        <th>End Time</th>
+                        <th>Duration</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody id="events-body">
                     <tr>
-                        <td colspan="3" class="no-events">No events to display</td>
+                        <td colspan="5" class="no-events">No events to display</td>
                     </tr>
                 </tbody>
             </table>
@@ -895,6 +910,28 @@
         function updateEventsLastUpdate() {
             lastEventsUpdate = new Date();
             document.getElementById('events-last-update').textContent = formatTime(lastEventsUpdate);
+        }
+
+        function calculateDuration(startTime, endTime) {
+            if (!startTime || !endTime) return '--';
+            
+            const start = new Date(startTime);
+            const end = new Date(endTime);
+            const diffMs = end - start;
+            
+            if (diffMs < 0) return '--';
+            
+            const hours = Math.floor(diffMs / (1000 * 60 * 60));
+            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m ${seconds}s`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${seconds}s`;
+            } else {
+                return `${seconds}s`;
+            }
         }
 
         // ================= STATUS & EVENT LOG ===================
@@ -1023,7 +1060,7 @@
         function loadAllEvents() {
             return new Promise((resolve, reject) => {
                 const tbody = document.getElementById('events-body');
-                tbody.innerHTML = '<tr><td colspan="3" class="no-events">Loading events...</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="no-events">Loading events...</td></tr>';
 
                 let allEvents = [];
                 let systemsProcessed = 0;
@@ -1052,21 +1089,83 @@
                             tbody.innerHTML = '';
                             if (allEvents.length === 0) {
                                 const row = document.createElement('tr');
-                                row.innerHTML = `<td colspan="3" class="no-events">No events to display</td>`;
+                                row.innerHTML = `<td colspan="5" class="no-events">No events to display</td>`;
                                 tbody.appendChild(row);
                             } else {
+                                // Group events by system and create start/end time pairs
+                                const systemEvents = {};
+                                
                                 allEvents.forEach(event => {
-                                    const row = document.createElement('tr');
-                                    // Add color coding based on status
-                                    let statusClass = '';
-                                    if (event.status === 'System_Fail' || event.status === 'OFF/TRIP') {
-                                        statusClass = 'class="off"';
-                                    } else {
-                                        statusClass = 'class="on"';
+                                    if (!systemEvents[event.system]) {
+                                        systemEvents[event.system] = [];
                                     }
+                                    systemEvents[event.system].push(event);
+                                });
+
+                                // Process each system's events to create start/end pairs
+                                Object.keys(systemEvents).forEach(systemName => {
+                                    const events = systemEvents[systemName];
+                                    events.sort((a, b) => a.timestamp - b.timestamp);
                                     
-                                    row.innerHTML = `<td>${event.system}</td><td>${event.time}</td><td ${statusClass}>${event.status}</td>`;
-                                    tbody.appendChild(row);
+                                    let currentStart = null;
+                                    let currentStatus = null;
+                                    
+                                    for (let i = 0; i < events.length; i++) {
+                                        const event = events[i];
+                                        
+                                        if (currentStart === null) {
+                                            // First event for this system
+                                            currentStart = event;
+                                            currentStatus = event.status;
+                                        } else if (event.status !== currentStatus) {
+                                            // Status changed, create a duration entry
+                                            const row = document.createElement('tr');
+                                            const duration = calculateDuration(currentStart.time, event.time);
+                                            
+                                            let statusClass = '';
+                                            if (currentStart.status === 'System_Fail' || currentStart.status === 'OFF/TRIP') {
+                                                statusClass = 'class="off"';
+                                            } else {
+                                                statusClass = 'class="on"';
+                                            }
+                                            
+                                            row.innerHTML = `
+                                                <td>${systemName}</td>
+                                                <td>${currentStart.time}</td>
+                                                <td>${event.time}</td>
+                                                <td class="duration-cell">${duration}</td>
+                                                <td ${statusClass}>${currentStart.status}</td>
+                                            `;
+                                            tbody.appendChild(row);
+                                            
+                                            // Start new period
+                                            currentStart = event;
+                                            currentStatus = event.status;
+                                        }
+                                        
+                                        // Handle last event
+                                        if (i === events.length - 1 && currentStart) {
+                                            const row = document.createElement('tr');
+                                            const endTime = new Date();
+                                            const duration = calculateDuration(currentStart.time, endTime);
+                                            
+                                            let statusClass = '';
+                                            if (currentStart.status === 'System_Fail' || currentStart.status === 'OFF/TRIP') {
+                                                statusClass = 'class="off"';
+                                            } else {
+                                                statusClass = 'class="on"';
+                                            }
+                                            
+                                            row.innerHTML = `
+                                                <td>${systemName}</td>
+                                                <td>${currentStart.time}</td>
+                                                <td>--</td>
+                                                <td class="duration-cell">${duration}</td>
+                                                <td ${statusClass}>${currentStart.status}</td>
+                                            `;
+                                            tbody.appendChild(row);
+                                        }
+                                    }
                                 });
                             }
                             resolve(allEvents);
