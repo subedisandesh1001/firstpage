@@ -942,16 +942,10 @@
         }
 
         function calculateDuration(startTime, endTime) {
-            if (!startTime || startTime === '--') return '--';
+            if (!startTime || startTime === '--' || !endTime || endTime === '--') return '--';
             
             const start = new Date(startTime);
-            let end;
-            
-            if (!endTime || endTime === '--') {
-                end = new Date(); // Current time for ongoing events
-            } else {
-                end = new Date(endTime);
-            }
+            const end = new Date(endTime);
             
             const diffMs = end - start;
             
@@ -1189,7 +1183,9 @@
                                 // Add rows to table in reverse chronological order
                                 allPeriods.forEach(period => {
                                     const row = document.createElement('tr');
-                                    const duration = calculateDuration(period.startTime, period.endTime);
+                                    // Only calculate duration if both start and end times are present
+                                    const duration = (period.endTime !== '--') ? 
+                                        calculateDuration(period.startTime, period.endTime) : '--';
                                     
                                     // Add status cell color class covering entire text area
                                     const statusClass = (period.status === 'System_Fail' || period.status === 'OFF/TRIP') ? 
