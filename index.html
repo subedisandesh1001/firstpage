@@ -618,6 +618,17 @@
             color: #4fdcfe;
         }
         
+        /* Status text colors only */
+        .status-text-on {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .status-text-off {
+            color: #f44336;
+            font-weight: bold;
+        }
+        
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -913,10 +924,17 @@
         }
 
         function calculateDuration(startTime, endTime) {
-            if (!startTime || !endTime) return '--';
+            if (!startTime || startTime === '--') return '--';
             
             const start = new Date(startTime);
-            const end = new Date(endTime);
+            let end;
+            
+            if (!endTime || endTime === '--') {
+                end = new Date(); // Current time for ongoing events
+            } else {
+                end = new Date(endTime);
+            }
+            
             const diffMs = end - start;
             
             if (diffMs < 0) return '--';
@@ -1122,19 +1140,16 @@
                                             const row = document.createElement('tr');
                                             const duration = calculateDuration(currentStart.time, event.time);
                                             
-                                            let statusClass = '';
-                                            if (currentStart.status === 'System_Fail' || currentStart.status === 'OFF/TRIP') {
-                                                statusClass = 'class="off"';
-                                            } else {
-                                                statusClass = 'class="on"';
-                                            }
+                                            // Add status text color class only
+                                            const statusClass = (currentStart.status === 'System_Fail' || currentStart.status === 'OFF/TRIP') ? 
+                                                'status-text-off' : 'status-text-on';
                                             
                                             row.innerHTML = `
                                                 <td>${systemName}</td>
                                                 <td>${currentStart.time}</td>
                                                 <td>${event.time}</td>
                                                 <td class="duration-cell">${duration}</td>
-                                                <td ${statusClass}>${currentStart.status}</td>
+                                                <td><span class="${statusClass}">${currentStart.status}</span></td>
                                             `;
                                             tbody.appendChild(row);
                                             
@@ -1143,25 +1158,21 @@
                                             currentStatus = event.status;
                                         }
                                         
-                                        // Handle last event
+                                        // Handle last event (ongoing status)
                                         if (i === events.length - 1 && currentStart) {
                                             const row = document.createElement('tr');
-                                            const endTime = new Date();
-                                            const duration = calculateDuration(currentStart.time, endTime);
+                                            const duration = calculateDuration(currentStart.time, null);
                                             
-                                            let statusClass = '';
-                                            if (currentStart.status === 'System_Fail' || currentStart.status === 'OFF/TRIP') {
-                                                statusClass = 'class="off"';
-                                            } else {
-                                                statusClass = 'class="on"';
-                                            }
+                                            // Add status text color class only
+                                            const statusClass = (currentStart.status === 'System_Fail' || currentStart.status === 'OFF/TRIP') ? 
+                                                'status-text-off' : 'status-text-on';
                                             
                                             row.innerHTML = `
                                                 <td>${systemName}</td>
                                                 <td>${currentStart.time}</td>
                                                 <td>--</td>
                                                 <td class="duration-cell">${duration}</td>
-                                                <td ${statusClass}>${currentStart.status}</td>
+                                                <td><span class="${statusClass}">${currentStart.status}</span></td>
                                             `;
                                             tbody.appendChild(row);
                                         }
