@@ -610,6 +610,136 @@
             min-width: 80px;
         }
         
+        /* Notification styles */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            max-width: 350px;
+            width: 90%;
+        }
+        
+        .notification {
+            background: rgba(15, 52, 96, 0.95);
+            border-left: 4px solid var(--accent);
+            color: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease-out;
+            backdrop-filter: blur(10px);
+        }
+        
+        .notification-icon {
+            font-size: 1.5rem;
+        }
+        
+        .notification-content {
+            flex: 1;
+        }
+        
+        .notification-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .notification-message {
+            font-size: 0.9rem;
+            color: #ddd;
+        }
+        
+        .notification-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        
+        .notification.hiding {
+            animation: slideOut 0.3s ease-out forwards;
+        }
+        
+        .notification-permission {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 52, 96, 0.95);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 10000;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .notification-permission-content {
+            flex: 1;
+        }
+        
+        .notification-permission-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .notification-permission-btn {
+            padding: 8px 15px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .notification-permission-allow {
+            background: var(--success);
+            color: white;
+        }
+        
+        .notification-permission-deny {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -661,6 +791,24 @@
                 min-width: 60px;
                 font-size: 0.8rem;
             }
+            
+            .notification-container {
+                right: 10px;
+                left: 10px;
+                max-width: none;
+                width: auto;
+            }
+            
+            .notification-permission {
+                bottom: 10px;
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .notification-permission-buttons {
+                width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -675,6 +823,21 @@
         <div class="floating-ball ball-6"></div>
         <div class="floating-ball ball-7"></div>
         <div class="floating-ball ball-8"></div>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notification-container"></div>
+
+    <!-- Notification Permission Request -->
+    <div class="notification-permission" id="notification-permission" style="display: none;">
+        <div class="notification-permission-content">
+            <strong>Enable Notifications</strong>
+            <p>Get notified when new events occur in the substation.</p>
+        </div>
+        <div class="notification-permission-buttons">
+            <button class="notification-permission-btn notification-permission-allow" id="allow-notifications">Allow</button>
+            <button class="notification-permission-btn notification-permission-deny" id="deny-notifications">Deny</button>
+        </div>
     </div>
 
     <!-- LOGIN -->
@@ -727,12 +890,11 @@
                 <h2>11 kV RAMAWAPUR CB</h2>
                 <div id="Feeder-3" class="status-box">--</div>
             </div>
-           <!---enable garne spare feeder ko lagi <div class="card">
+           <!--- <div class="card">
                <h2>SPARE FEEDER-3</h2>
                 <div id="Feeder-4" class="status-box">--</div>
-        </div-------> spare feeder ko lagi yo lai enable garne>
+           </div>  --->
         </div
-
         <footer>
             <div class="footer-info">
                 <p>📧 subedisubedi7@gmail.com</p>
@@ -817,6 +979,124 @@
         let initialLoadComplete = false;
         let lastEventsUpdate = null;
         let isUpdatingEvents = false;
+        let notificationPermissionRequested = false;
+        let notificationEnabled = false;
+
+        // ================= NOTIFICATION SYSTEM ===================
+        function showNotification(title, message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            
+            // Set icon based on type
+            let icon = '🔔';
+            if (type === 'warning') icon = '⚠️';
+            if (type === 'error') icon = '🚨';
+            if (type === 'success') icon = '✅';
+            
+            notification.innerHTML = `
+                <div class="notification-icon">${icon}</div>
+                <div class="notification-content">
+                    <div class="notification-title">${title}</div>
+                    <div class="notification-message">${message}</div>
+                </div>
+                <button class="notification-close">×</button>
+            `;
+            
+            // Add to container
+            const container = document.getElementById('notification-container');
+            container.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            const autoRemove = setTimeout(() => {
+                closeNotification(notification);
+            }, 5000);
+            
+            // Close button event
+            const closeBtn = notification.querySelector('.notification-close');
+            closeBtn.addEventListener('click', () => {
+                clearTimeout(autoRemove);
+                closeNotification(notification);
+            });
+            
+            // Show browser notification if enabled and page is not visible
+            if (notificationEnabled && document.hidden) {
+                showBrowserNotification(title, message);
+            }
+        }
+        
+        function closeNotification(notification) {
+            notification.classList.add('hiding');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }
+        
+        function showBrowserNotification(title, message) {
+            if (!('Notification' in window)) return;
+            
+            if (Notification.permission === 'granted') {
+                const notification = new Notification(title, {
+                    body: message,
+                    icon: 'logo.png',
+                    tag: 'substation-event'
+                });
+                
+                // Auto close after 5 seconds
+                setTimeout(() => {
+                    notification.close();
+                }, 5000);
+                
+                // Focus on click
+                notification.onclick = function() {
+                    window.focus();
+                    this.close();
+                };
+            }
+        }
+        
+        function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                console.log('This browser does not support notifications');
+                return;
+            }
+            
+            if (Notification.permission === 'default' && !notificationPermissionRequested) {
+                notificationPermissionRequested = true;
+                const permissionElement = document.getElementById('notification-permission');
+                permissionElement.style.display = 'flex';
+                
+                document.getElementById('allow-notifications').addEventListener('click', () => {
+                    Notification.requestPermission().then(permission => {
+                        permissionElement.style.display = 'none';
+                        if (permission === 'granted') {
+                            notificationEnabled = true;
+                            localStorage.setItem('notificationsEnabled', 'true');
+                            showNotification('Notifications Enabled', 'You will now receive notifications for new events.', 'success');
+                        }
+                    });
+                });
+                
+                document.getElementById('deny-notifications').addEventListener('click', () => {
+                    permissionElement.style.display = 'none';
+                    localStorage.setItem('notificationsEnabled', 'false');
+                });
+            } else if (Notification.permission === 'granted') {
+                notificationEnabled = true;
+            }
+        }
+        
+        function checkNotificationSettings() {
+            const savedSetting = localStorage.getItem('notificationsEnabled');
+            if (savedSetting === 'true' && Notification.permission === 'granted') {
+                notificationEnabled = true;
+            } else if (savedSetting === null && Notification.permission === 'default') {
+                // Show permission request after a delay when user is logged in
+                setTimeout(requestNotificationPermission, 2000);
+            }
+        }
 
         // ================= VISITOR COUNTER ===================
         async function updateVisitorCounter() {
@@ -896,9 +1176,25 @@
                     if (!document.hidden) {
                         startBlinkingTitle(`⚠️ ${systemName} ${status}`);
                     }
+                    
+                    // Show notification for status change
+                    showNotification(
+                        `${systemName} Status Change`,
+                        `${systemName} is now ${status}`,
+                        'warning'
+                    );
                 }
             } else {
                 box.className = "status-box on";
+                
+                if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
+                    // Show notification for status change
+                    showNotification(
+                        `${systemName} Status Change`,
+                        `${systemName} is now ${status}`,
+                        'success'
+                    );
+                }
                 
                 if (!document.hidden) {
                     stopBlinkingTitle();
@@ -939,6 +1235,9 @@
                     }
                 });
             });
+            
+            // Check notification settings after dashboard is initialized
+            checkNotificationSettings();
         }
 
         // ================= AUTHENTICATION ===================
