@@ -610,54 +610,6 @@
             min-width: 80px;
         }
         
-        /* Notification Permission */
-        .notification-permission {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 52, 96, 0.95);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            z-index: 10000;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            max-width: 500px;
-            width: 90%;
-        }
-        
-        .notification-permission-content {
-            flex: 1;
-        }
-        
-        .notification-permission-buttons {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .notification-permission-btn {
-            padding: 8px 15px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        
-        .notification-permission-allow {
-            background: var(--success);
-            color: white;
-        }
-        
-        .notification-permission-deny {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-        }
-        
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -709,17 +661,6 @@
                 min-width: 60px;
                 font-size: 0.8rem;
             }
-            
-            .notification-permission {
-                bottom: 10px;
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .notification-permission-buttons {
-                width: 100%;
-                justify-content: center;
-            }
         }
     </style>
 </head>
@@ -734,18 +675,6 @@
         <div class="floating-ball ball-6"></div>
         <div class="floating-ball ball-7"></div>
         <div class="floating-ball ball-8"></div>
-    </div>
-
-    <!-- Notification Permission Request -->
-    <div class="notification-permission" id="notification-permission" style="display: none;">
-        <div class="notification-permission-content">
-            <strong>🔔 Enable Browser Notifications</strong>
-            <p>Get real-time alerts when feeder status changes, even when this tab is in background or closed.</p>
-        </div>
-        <div class="notification-permission-buttons">
-            <button class="notification-permission-btn notification-permission-allow" id="allow-notifications">Allow</button>
-            <button class="notification-permission-btn notification-permission-deny" id="deny-notifications">Block</button>
-        </div>
     </div>
 
     <!-- LOGIN -->
@@ -798,10 +727,10 @@
                 <h2>11 kV RAMAWAPUR CB</h2>
                 <div id="Feeder-3" class="status-box">--</div>
             </div>
-           <!--- <div class="card">
+           <!---enable garne spare feeder ko lagi <div class="card">
                <h2>SPARE FEEDER-3</h2>
                 <div id="Feeder-4" class="status-box">--</div>
-        </div-------> 
+        </div-------> spare feeder ko lagi yo lai enable garne>
         </div
 
         <footer>
@@ -888,164 +817,6 @@
         let initialLoadComplete = false;
         let lastEventsUpdate = null;
         let isUpdatingEvents = false;
-        let notificationPermissionRequested = false;
-        let notificationEnabled = false;
-
-        // ================= CHROME NOTIFICATION SYSTEM ===================
-        class NotificationManager {
-            constructor() {
-                this.isSupported = 'Notification' in window;
-                this.permission = this.isSupported ? Notification.permission : 'denied';
-                this.notificationTimeout = 8000; // 8 seconds
-            }
-
-            async requestPermission() {
-                if (!this.isSupported) {
-                    console.log('Browser does not support notifications');
-                    return false;
-                }
-
-                if (this.permission === 'default') {
-                    try {
-                        this.permission = await Notification.requestPermission();
-                        if (this.permission === 'granted') {
-                            notificationEnabled = true;
-                            localStorage.setItem('notificationsEnabled', 'true');
-                            this.showWelcomeNotification();
-                            return true;
-                        }
-                    } catch (error) {
-                        console.error('Error requesting notification permission:', error);
-                    }
-                }
-                return this.permission === 'granted';
-            }
-
-            showWelcomeNotification() {
-                this.show(
-                    '🔔 Notifications Enabled',
-                    'You will now receive alerts for feeder status changes.',
-                    'success'
-                );
-            }
-
-            show(title, message, type = 'info') {
-                if (!this.isSupported || this.permission !== 'granted') {
-                    return;
-                }
-
-                // Don't show notification if page is visible and focused
-                if (document.visibilityState === 'visible' && document.hasFocus()) {
-                    console.log('Page is visible, skipping notification');
-                    return;
-                }
-
-                const icon = this.getIconForType(type);
-                
-                const notification = new Notification(title, {
-                    body: message,
-                    icon: icon,
-                    badge: icon,
-                    tag: 'substation-alert', // Group similar notifications
-                    requireInteraction: false,
-                    silent: false,
-                    vibrate: [200, 100, 200] // Vibration pattern for mobile
-                });
-
-                // Auto close after timeout
-                setTimeout(() => {
-                    notification.close();
-                }, this.notificationTimeout);
-
-                // Focus window when notification is clicked
-                notification.onclick = () => {
-                    window.focus();
-                    notification.close();
-                };
-
-                notification.onerror = (error) => {
-                    console.error('Notification error:', error);
-                };
-
-                return notification;
-            }
-
-            getIconForType(type) {
-                const icons = {
-                    'error': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23f44336"/><text x="50" y="60" text-anchor="middle" fill="white" font-size="40">⚠️</text></svg>',
-                    'success': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%234CAF50"/><text x="50" y="60" text-anchor="middle" fill="white" font-size="40">✅</text></svg>',
-                    'warning': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23FF9800"/><text x="50" y="60" text-anchor="middle" fill="white" font-size="40">🔔</text></svg>',
-                    'info': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%232196F3"/><text x="50" y="60" text-anchor="middle" fill="white" font-size="40">ℹ️</text></svg>'
-                };
-                return icons[type] || icons.info;
-            }
-
-            showStatusChangeNotification(systemName, oldStatus, newStatus) {
-                const isCritical = newStatus === 'System_Fail' || newStatus === 'OFF/TRIP';
-                const isRestored = !isCritical && (oldStatus === 'System_Fail' || oldStatus === 'OFF/TRIP');
-                
-                let title, message, type;
-
-                if (isCritical) {
-                    title = `🚨 ${systemName} ALERT`;
-                    message = `${systemName} changed from ${oldStatus} to ${newStatus}. Immediate attention required!`;
-                    type = 'error';
-                } else if (isRestored) {
-                    title = `✅ ${systemName} RESTORED`;
-                    message = `${systemName} is back online. Status: ${newStatus}`;
-                    type = 'success';
-                } else {
-                    title = `🔔 ${systemName} Update`;
-                    message = `${systemName} status changed to ${newStatus}`;
-                    type = 'info';
-                }
-
-                this.show(title, message, type);
-            }
-
-            checkPermissionStatus() {
-                if (this.isSupported) {
-                    this.permission = Notification.permission;
-                }
-                return this.permission;
-            }
-        }
-
-        // Initialize notification manager
-        const notificationManager = new NotificationManager();
-
-        async function requestNotificationPermission() {
-            if (notificationPermissionRequested) return;
-            
-            notificationPermissionRequested = true;
-            const permissionElement = document.getElementById('notification-permission');
-            permissionElement.style.display = 'flex';
-            
-            document.getElementById('allow-notifications').addEventListener('click', async () => {
-                permissionElement.style.display = 'none';
-                const granted = await notificationManager.requestPermission();
-                if (!granted) {
-                    localStorage.setItem('notificationsEnabled', 'false');
-                }
-            });
-            
-            document.getElementById('deny-notifications').addEventListener('click', () => {
-                permissionElement.style.display = 'none';
-                localStorage.setItem('notificationsEnabled', 'false');
-            });
-        }
-        
-        function checkNotificationSettings() {
-            const savedSetting = localStorage.getItem('notificationsEnabled');
-            const currentPermission = notificationManager.checkPermissionStatus();
-            
-            if (savedSetting === 'true' && currentPermission === 'granted') {
-                notificationEnabled = true;
-            } else if (savedSetting === null && currentPermission === 'default') {
-                // Show permission request after a delay when user is logged in
-                setTimeout(requestNotificationPermission, 3000);
-            }
-        }
 
         // ================= VISITOR COUNTER ===================
         async function updateVisitorCounter() {
@@ -1125,36 +896,16 @@
                     if (!document.hidden) {
                         startBlinkingTitle(`⚠️ ${systemName} ${status}`);
                     }
-                    
-                    // Show browser notification for critical status change
-                    if (notificationEnabled) {
-                        notificationManager.showStatusChangeNotification(
-                            systemName, 
-                            lastStatus[systemId], 
-                            status
-                        );
-                    }
                 }
             } else {
                 box.className = "status-box on";
-                
-                if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
-                    // Show browser notification for status restoration
-                    if (notificationEnabled) {
-                        notificationManager.showStatusChangeNotification(
-                            systemName, 
-                            lastStatus[systemId], 
-                            status
-                        );
-                    }
-                }
                 
                 if (!document.hidden) {
                     stopBlinkingTitle();
                 }
             }
 
-            // Update last status and track changes
+            // Only update status display, no event logging to Firebase
             if (!isInitialLoad && lastStatus.hasOwnProperty(systemId) && lastStatus[systemId] !== status) {
                 console.log(`Status change detected for ${systemName}: ${lastStatus[systemId]} -> ${status}`);
                 lastStatus[systemId] = status;
@@ -1188,9 +939,6 @@
                     }
                 });
             });
-            
-            // Check notification settings after dashboard is initialized
-            checkNotificationSettings();
         }
 
         // ================= AUTHENTICATION ===================
